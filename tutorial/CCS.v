@@ -46,11 +46,12 @@ Section Syntax.
   | Send (c : chan) (v : value) : action
   | Rcv (c : chan) : action.
 
+  (* We consider CCS with guarded choice for now *)
   Inductive term : Type :=
   | Nil : term
   | Action (a : action) (p : term)
   | CallP (x : pid)
-  | Choice (p1 p2 : term)
+  | Choice (a1 : action) (p1 : term) (a2 : action) (p2 : term) (* a1.p1 + a2.p2 *)
   | Para (p1 p2 : term)
   | Subst (p : term) (b a : chan)
   | Restrict (p : term) (c : chan).
@@ -87,46 +88,55 @@ Section Representation.
     x <- trigger (Throw s);; match x: void with end.
 
   (*
-The internal divergence has a tricky behavior: it can only takes
-a branch that exhibits a reduction.
+    The internal divergence has a tricky behavior: it can only takes
+    a branch that exhibits a reduction.
 
-One solution would seem to be to introspect the branch and fail if we
-do not find an action to perform.
+    One solution would seem to be to introspect the branch and fail if we
+    do not find an action to perform.
 
-However, this process is not purely syntactic due to the mutually recursive processes: it could diverge in the case of:
+    However, this process is not purely syntactic due to the mutually recursive processes: it could diverge in the case of:
 
     f := rec g
     g := rec f
 
-What is the right solution to this problem?
+    What is the right solution to this problem?
 
-Conjecture: it suffices to explore the recursive calls until we reach a cycle.
-
+    Conjecture: it suffices to explore the recursive calls until we reach a cycle.
    *)
+
+  (* Nil == Tau^omega *)
+  (* (0 || P) ~~ P *)
+  
+  (* f := a.rec g *)
+  (* g := bar a.rec f *)
+  (* (f || a) {Nil, a} *)
+  (* nu a.(f || b) *)
+  (* (a^omega || b) *)
+  (* a^omega *)
 
   Fixpoint get_next_action (t : term) :
     itree (callE term unit +' E) (term * action) :=
     match t with
     | Nil => throw "No action found in this internal branch"
     | Action a t => ret (t, a)
-    | CallP _ => throw "TODO: This is a restriction" 
-    | Choice t1 t2 =>
+    | CallP _ => throw "TODO: This is a restriction"
+    | Choice a1 t1 a2 t2 =>
       b <- trigger (SChoice t1 t2);;
       if b:bool
-      then get_next_action t1
-      else get_next_action t2
+      then ret (t1,a1)
+      else ret (t2,a2)
     | Para t1 t2 =>
       b <- trigger SPara;;
       if b:bool
       then
         '(t1',a) <- get_next_action t1;;
         ret (Para t1' t2, a)
-      else 
+      else
         '(t2',a) <- get_next_action t1;;
         ret (Para t1 t2', a)
     | Subst _ _ _ => throw "TODO"
     | Restrict _ _ => throw "TODO"
-    end. 
+    end.
 
   Definition do_action (a : action) :
     itree (callE term unit +' E) unit :=
@@ -158,21 +168,42 @@ Conjecture: it suffices to explore the recursive calls until we reach a cycle.
         (* This one is a special version of a recursive call *)
         | CallP p => trigger (CallProcess p)
 
-        | Choice p1 p2 =>
+        | Choice a1 p1 a2 p2 =>
           b <- trigger (SChoice p1 p2) ;;
           if b: bool
           then
-            '(t',a) <- get_next_action p1;;
-            do_action a;;
-            trigger (Call t')
+            do_action a1;;
+            trigger (Call p1)
           else 
-            '(t',a) <- get_next_action p2;;
+            do_action a2;;
+            trigger (Call p2)
+
+        | Para t1 t2 =>
+          b <- trigger SPara ;;
+          if b: bool
+          then
+            '(t1',a) <- get_next_action t1;;
             do_action a;;
-            trigger (Call t')
-        | Para t1 t2 => throw "TODO"
+            trigger (Call (Para t1' t2))
+          else 
+            '(t2',a) <- get_next_action t2;;
+            do_action a;;
+            trigger (Call (Para t1 t2'))
         | Subst _ _ _ => throw "TODO"
         | Restrict _ _ => throw "TODO"
         end).
+
+    (*
+
+!P -> P
+
+       !P -> Nil   et !P -> P || !P
+
+        tree1 <- sem t1;; 
+        tree2 <- sem t2;;
+        combinator_para tree1 tree2
+
+     *)
 
 (*
     rec
