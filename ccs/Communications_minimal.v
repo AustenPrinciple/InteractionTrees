@@ -124,18 +124,17 @@ Module CCS.
     
     Definition para : ccs -> ccs -> ccs :=
       cofix F (P : ccs) (Q : ccs) := 
-        c <- trigger Sched;;
         branch
           (x <- get_hd P;;
            match x with
-           | HDone => nil
+           | HDone => Q
            | HSynch P => vis Synch (fun _ => F P Q)
            | HAct a P => vis (Act a) (fun _ => F P Q)
            end
           )
           (x <- get_hd Q ;;
            match x with
-           | HDone => nil
+           | HDone => P
            | HSynch Q => vis Synch (fun _ => F P Q)
            | HAct a Q => vis (Act a) (fun _ => F P Q)
            end
