@@ -1,10 +1,14 @@
+(** * Experiments in the realm of parallel combinators for itrees
+*)
+
 From ITree Require Import
      ITree
      Eq.Eq
      Events.Exception
      ITreeFacts.
-Require Import OGS.PropT.
+Require Import PropT.
 Import ITreeNotations.
+Open Scope itree.
 
 (** * get_hd
     Computes the first visible event of a tree, or its return value if the computation is pure.
@@ -348,35 +352,4 @@ Section Synchro.
       end.
 
 End Synchro.
-
-(* begin hide *)
-From Coq Require Import
-     Strings.String.
-
-Section Syntax.
-
-  Definition chan : Set := string.
-  Definition value : Type := nat.
-  Definition pid : Set := string.
-
-  Variant action : Type :=
-  | Send (c : chan) (v : value) : action
-  | Rcv (c : chan) : action.
-
-  (* We consider CCS with guarded choice for now *)
-  Inductive term : Type :=
-  | Nil : term
-  | Action (a : action) (p : term)
-  | Para (p1 p2 : term).
-
-End Syntax.
-
-(* Comment faire un opérateur parallèle qui combine les trois "types" de comportements de (P1 || P2):
-   P1 expose au moinde extérieur une action
-   P2 expose au moinde extérieur une action
-   P1 et P2 font une synchro
-
-   ⟦ P ⟧ : term -> itree E unit/term
-
- *)
 
