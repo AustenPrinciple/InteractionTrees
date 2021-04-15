@@ -205,7 +205,7 @@ Module CCS2.
 
     Definition context := list chan. 
     Definition in_context (Γ : context) (c : chan) :=
-      in_dec string_dec c Γ.
+      if in_dec string_dec c Γ then true else false.
     Notation "a ∈ Γ" := (in_context Γ a) (at level 10).
 
     Definition act Γ (a : action) : option ccs :=
@@ -296,6 +296,47 @@ Module CCS2.
         ret (para P Q)
       | RestrictT c t => model (c :: Γ) t
       end.
+
+    Inductive well_scoped: context -> term -> Prop :=
+    | WSdone : forall Γ, well_scoped Γ DoneT
+    | WSSend : forall Γ c P, c ∈ Γ = true ->
+                        well_scoped Γ P ->
+                        well_scoped Γ (ActionT (Send c) P)
+    | WSRcv : forall Γ c P, c ∈ Γ = true ->
+                       well_scoped Γ P ->
+                       well_scoped Γ (ActionT (Rcv c) P)
+    | WSpara : forall Γ P Q,
+        well_scoped Γ P ->
+        well_scoped Γ Q ->
+        well_scoped Γ (ParaT P Q)
+    | WSrestrict : forall Γ c P,
+        well_scoped (c::Γ) P ->
+        well_scoped Γ (RestrictT c P)
+    .
+
+    Lemma WS_succeed :
+      forall Γ P,
+        well_scoped Γ P ->
+        exists ccs, model Γ P = Some ccs. 
+    Proof.
+      induction 1.
+      - eexists; reflexivity.
+      - cbn.
+        rewrite H.
+        destruct IHwell_scoped as (? & EQ); rewrite EQ.
+        eexists; reflexivity.
+      - cbn.
+        rewrite H.
+        destruct IHwell_scoped as (? & EQ); rewrite EQ.
+        eexists; reflexivity.
+      - cbn.
+        destruct IHwell_scoped1 as (? & EQ); rewrite EQ.
+        destruct IHwell_scoped2 as (? & EQ'); rewrite EQ'.
+        eexists; reflexivity.
+      - cbn.
+        destruct IHwell_scoped as (? & EQ); rewrite EQ.
+        eexists; reflexivity.
+    Qed.
 
   End Semantics.
 
