@@ -338,6 +338,14 @@ Module CCS2.
         eexists; reflexivity.
     Qed.
 
+    Lemma closed_processes_are_denoted :
+      forall P,
+        well_scoped nil P ->
+        exists ccs, model nil P = Some ccs. 
+    Proof.
+      intros; eapply WS_succeed; eauto.
+    Qed.
+
   End Semantics.
 
 End CCS2.
