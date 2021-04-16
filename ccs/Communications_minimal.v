@@ -82,14 +82,17 @@ Module CCS.
       | Synchronize => R
       end.
 
-    Variant head := | HDone | HSynch (P : ccs) | HAct (a : action) (P : ccs).
+    Variant head :=
+    | HDone
+    | HSynch (P : ccs)
+    | HAct (a : action) (P : ccs).
 
     (* Notations for patterns *)
     Notation "'schedP' e" := (inl1 e) (at level 10).
     Notation "'actP' e" := (inr1 (inl1 e)) (at level 10).
     Notation "'synchP' e" := (inr1 (inr1 (inl1 e))) (at level 10).
     Notation "'deadP' e" := (inr1 (inr1 (inr1 e))) (at level 10).
-    
+
     Definition get_hd : ccs -> ccsT head :=
       cofix get_hd (P : ccs) := 
         match observe P with
@@ -155,10 +158,10 @@ Module CCS.
     Definition restrict : chan -> ccs -> ccs :=
       fun c P =>
         interp (case_ h_trigger (case_ (h_restrict c) h_trigger)) P.
-
+    
     Fixpoint model (t : term) : ccs :=
       match t with
-      | DoneT          => done
+      | DoneT         => done
       | ActionT a t   => act a;; model t
       | ParaT t1 t2   => para (model t1) (model t2)
       | RestrictT c t => restrict c (model t)
@@ -167,7 +170,6 @@ Module CCS.
   End Semantics.
 
 End CCS.
-
 
 Module CCS2.
 
@@ -210,7 +212,7 @@ Module CCS2.
 
     Definition act Γ (a : action) : option ccs :=
       match a with
-      | Send c | Rcv c => if c ∈ Γ then Some (trigger (Act a)) else None
+      | Send c | Rcv c => if c ∈ Γ then None else Some (trigger (Act a))
       end.
     
     Definition branch2 (P Q : ccs) : ccs :=
@@ -283,6 +285,7 @@ Module CCS2.
 
     Import MonadNotation.
     Open Scope monad.
+    (* This approach to name restriction is incorrect *)
     Fixpoint model (Γ : context) (t : term) : option ccs :=
       match t with
       | DoneT         => ret done
@@ -297,54 +300,67 @@ Module CCS2.
       | RestrictT c t => model (c :: Γ) t
       end.
 
-    Inductive well_scoped: context -> term -> Prop :=
-    | WSdone : forall Γ, well_scoped Γ DoneT
-    | WSSend : forall Γ c P, c ∈ Γ = true ->
-                        well_scoped Γ P ->
-                        well_scoped Γ (ActionT (Send c) P)
-    | WSRcv : forall Γ c P, c ∈ Γ = true ->
-                       well_scoped Γ P ->
-                       well_scoped Γ (ActionT (Rcv c) P)
-    | WSpara : forall Γ P Q,
-        well_scoped Γ P ->
-        well_scoped Γ Q ->
-        well_scoped Γ (ParaT P Q)
-    | WSrestrict : forall Γ c P,
-        well_scoped (c::Γ) P ->
-        well_scoped Γ (RestrictT c P)
-    .
+    (* P ==  ν a. (a || a|)
 
-    Lemma WS_succeed :
-      forall Γ P,
-        well_scoped Γ P ->
-        exists ccs, model Γ P = Some ccs. 
-    Proof.
-      induction 1.
-      - eexists; reflexivity.
-      - cbn.
-        rewrite H.
-        destruct IHwell_scoped as (? & EQ); rewrite EQ.
-        eexists; reflexivity.
-      - cbn.
-        rewrite H.
-        destruct IHwell_scoped as (? & EQ); rewrite EQ.
-        eexists; reflexivity.
-      - cbn.
-        destruct IHwell_scoped1 as (? & EQ); rewrite EQ.
-        destruct IHwell_scoped2 as (? & EQ'); rewrite EQ'.
-        eexists; reflexivity.
-      - cbn.
-        destruct IHwell_scoped as (? & EQ); rewrite EQ.
-        eexists; reflexivity.
-    Qed.
+       model P [] ~ Some {Synch}
 
-    Lemma closed_processes_are_denoted :
-      forall P,
-        well_scoped nil P ->
-        exists ccs, model nil P = Some ccs. 
-    Proof.
-      intros; eapply WS_succeed; eauto.
-    Qed.
+       model (a || a|) [(a,0)]
+
+       model a [(a,n)] ~ Some {a}
+
+para [(a,0)] {a} {a|}
+
+       model (a || a|) [(a,0)]
+
+     *)
+    (* Inductive well_scoped: context -> term -> Prop := *)
+    (* | WSdone : forall Γ, well_scoped Γ DoneT *)
+    (* | WSSend : forall Γ c P, c ∈ Γ = true -> *)
+    (*                     well_scoped Γ P -> *)
+    (*                     well_scoped Γ (ActionT (Send c) P) *)
+    (* | WSRcv : forall Γ c P, c ∈ Γ = true -> *)
+    (*                    well_scoped Γ P -> *)
+    (*                    well_scoped Γ (ActionT (Rcv c) P) *)
+    (* | WSpara : forall Γ P Q, *)
+    (*     well_scoped Γ P -> *)
+    (*     well_scoped Γ Q -> *)
+    (*     well_scoped Γ (ParaT P Q) *)
+    (* | WSrestrict : forall Γ c P, *)
+    (*     well_scoped (c::Γ) P -> *)
+    (*     well_scoped Γ (RestrictT c P) *)
+    (* . *)
+
+    (* Lemma WS_succeed : *)
+    (*   forall Γ P, *)
+    (*     well_scoped Γ P -> *)
+    (*     exists ccs, model Γ P = Some ccs.  *)
+    (* Proof. *)
+    (*   induction 1. *)
+    (*   - eexists; reflexivity. *)
+    (*   - cbn. *)
+    (*     rewrite H. *)
+    (*     destruct IHwell_scoped as (? & EQ); rewrite EQ. *)
+    (*     eexists; reflexivity. *)
+    (*   - cbn. *)
+    (*     rewrite H. *)
+    (*     destruct IHwell_scoped as (? & EQ); rewrite EQ. *)
+    (*     eexists; reflexivity. *)
+    (*   - cbn. *)
+    (*     destruct IHwell_scoped1 as (? & EQ); rewrite EQ. *)
+    (*     destruct IHwell_scoped2 as (? & EQ'); rewrite EQ'. *)
+    (*     eexists; reflexivity. *)
+    (*   - cbn. *)
+    (*     destruct IHwell_scoped as (? & EQ); rewrite EQ. *)
+    (*     eexists; reflexivity. *)
+    (* Qed. *)
+
+    (* Lemma closed_processes_are_denoted : *)
+    (*   forall P, *)
+    (*     well_scoped nil P -> *)
+    (*     exists ccs, model nil P = Some ccs.  *)
+    (* Proof. *)
+    (*   intros; eapply WS_succeed; eauto. *)
+    (* Qed. *)
 
   End Semantics.
 
