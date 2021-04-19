@@ -1,0 +1,5 @@
+(coq.extraction
+ (prelude ExtractCCS)
+ (extracted_modules Denotational)
+ (theories ITree CCS)
+)

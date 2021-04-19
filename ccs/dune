@@ -1,0 +1,14 @@
+(coq.theory
+ (name CCS)
+ (modules
+   Utils
+   PropT
+   Syntax
+   Operational
+   Denotational
+ )
+ (theories ITree)
+)
+
+; Extraction is in a separate directory (extraction/) because dune's
+; coq.extraction assigns it another library name than ITreeExamples
