@@ -1,0 +1,179 @@
+(* begin hide *)
+From ITree Require Import
+     ITree
+     Eq.Eq
+     Events.Exception
+     ITreeFacts.
+
+Require Import
+        PropT
+        Syntax
+        Utils
+.
+Import ITreeNotations.
+Open Scope itree.
+Import CCSNotations.
+Open Scope ccs_scope.
+
+Section Semantics.
+
+  Variant ActionE : Type -> Type :=
+  | Act (a : action) : ActionE unit.
+
+  Variant SynchE : Type -> Type := | Synch : SynchE unit.
+
+  Variant choice := | Left | Right | Synchronize.
+
+  Variant NonDetE : Type -> Type :=
+  | Plus : NonDetE bool
+  | Sched : NonDetE choice.
+
+  Definition DeadE := exceptE unit.
+  Definition dead {A : Type} {E} `{DeadE -< E} : itree E A :=
+    x <- trigger (Throw tt);; match x: void with end.
+
+  Notation ccsE   := (NonDetE +' ActionE +' SynchE +' DeadE).
+  Notation ccsT T := (itree ccsE T).
+  Notation ccs    := (ccsT unit).
+
+  Definition done : ccs := Ret tt.
+
+  Definition act (a : action) : ccs := trigger (Act a).
+
+  Definition branch2 (P Q : ccs) : ccs :=
+    b <- trigger Plus;;
+    match b with
+    | true => P
+    | false => Q
+    end.
+
+  Definition branch3 (P Q R : ccs) : ccs :=
+    b <- trigger Sched;;
+    match b with
+    | Left => P
+    | Right => Q
+    | Synchronize => R
+    end.
+
+  Variant head :=
+  | HDone
+  | HSynch (P : ccs)
+  | HAct (a : action) (P : ccs).
+
+  (* Notations for patterns *)
+  Notation "'schedP' e" := (inl1 e) (at level 10).
+  Notation "'actP' e" := (inr1 (inl1 e)) (at level 10).
+  Notation "'synchP' e" := (inr1 (inr1 (inl1 e))) (at level 10).
+  Notation "'deadP' e" := (inr1 (inr1 (inr1 e))) (at level 10).
+
+  Definition get_hd : ccs -> ccsT head :=
+    cofix get_hd (P : ccs) := 
+      match observe P with
+      | RetF x => Ret HDone
+      | TauF P => Tau (get_hd P)
+      | @VisF _ _ _ T e k => 
+        match e with
+        | schedP e => vis e (fun x => get_hd (k x))
+        | actP e =>
+          match e in ActionE X return (T = X -> ccsT head) with
+          | Act a => fun (Pf : T = unit) =>
+                      Ret (HAct a (@eq_rect_r _ T (fun T => T -> itree ccsE unit) k unit (eq_sym Pf) tt))
+          end eq_refl
+        | synchP e =>
+          match e in SynchE X return (T = X -> ccsT head) with
+          | Synch => fun (Pf : T = unit) =>
+                      Ret (HSynch (@eq_rect_r _ T (fun T => T -> itree ccsE unit) k unit (eq_sym Pf) tt))
+          end eq_refl
+        | deadP e => dead
+        end
+      end.
+  
+  Definition para : ccs -> ccs -> ccs :=
+    cofix F (P : ccs) (Q : ccs) := 
+      branch3
+        (x <- get_hd P;;
+         match x with
+         | HDone => Q
+         | HSynch P => vis Synch (fun _ => F P Q)
+         | HAct a P => vis (Act a) (fun _ => F P Q)
+         end
+        )
+        (x <- get_hd Q ;;
+         match x with
+         | HDone => P
+         | HSynch Q => vis Synch (fun _ => F P Q)
+         | HAct a Q => vis (Act a) (fun _ => F P Q)
+         end
+        )
+        (rP <- get_hd P;; 
+         rQ <- get_hd Q;; 
+         match rP,rQ with
+         | HAct a P, HAct b Q =>
+           if are_opposite a b
+           then vis Synch (fun _ => F P Q)
+           else dead
+         | _, _ => dead
+         end
+        )
+  .
+
+  Definition plus : ccs -> ccs -> ccs :=
+    branch2.
+
+  Definition h_trigger {E F} `{E -< F} : E ~> itree F :=
+    fun _ e => trigger e.
+
+  Definition h_restrict (c : chan) : Handler ActionE ccsE :=
+    fun _ e => let '(Act a) := e in
+            match a with
+            | Send c'
+            | Rcv c' =>
+              if c =? c' then dead else trigger e
+            end.
+
+  Definition restrict : chan -> ccs -> ccs :=
+    fun c P =>
+      interp (case_ h_trigger (case_ (h_restrict c) h_trigger)) P.
+
+  Fixpoint model (t : term) : ccs :=
+    match t with
+    | DoneT         => done
+    | ActionT a t   => act a;; model t
+    | ParaT t1 t2   => para (model t1) (model t2)
+    | PlusT t1 t2   => plus (model t1) (model t2)
+    | RestrictT c t => restrict c (model t)
+    end.
+
+End Semantics.
+
+(* From Coq Require ExtrOcamlBasic ExtrOcamlString. *)
+
+(* Extraction Language OCaml. *)
+(* Extraction Blacklist String List Char Core Z. *)
+
+(* Set Extraction AccessOpaque. *)
+
+(* Extraction "ccs.ml" model. *)
+
+(* Parameter exit_success : unit. *)
+(* Parameter exit_failure : unit. *)
+(* Extract Inlined Constant exit_success => *)
+(*   "print_endline ""OK!""; exit 0". *)
+(* Extract Inlined Constant exit_failure => *)
+(*   "print_endline ""IO test failed!""; exit 1". *)
+
+(* Definition test_io := *)
+(*   if test_interp example then *)
+(*     exit_success *)
+(*   else *)
+(*     exit_failure. *)
+
+(* Extraction "io.ml" test_io. *)
+
+(* Definition p := (model (ex 0 0)). *)
+(* Goal p ≈ p. *)
+(*   tau_steps. *)
+
+
+(* ITree.subst *)
+(* Compute prefix' 23 p . *)
