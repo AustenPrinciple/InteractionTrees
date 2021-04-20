@@ -19,7 +19,7 @@ Definition p1 := (model  DoneT).
 Definition p2 := (model (ActionT (Send "a") DoneT)).
 
 Definition p3 := (model (ParaT (ActionT (Send "a") DoneT) (ActionT (Rcv "a") DoneT))).
- 
+
 Definition p4 := (model (ParaT (ActionT (Rcv "a") DoneT) (ActionT (Send "a") DoneT))).
 
 Definition p5 := (model (ParaT (ActionT (Send "a") DoneT) (ActionT (Rcv "b") DoneT))).

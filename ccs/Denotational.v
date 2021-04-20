@@ -5,10 +5,10 @@ From ITree Require Import
      Events.Exception
      ITreeFacts.
 
-Require Import
-        PropT
-        Syntax
-        Utils
+From CCS Require Import
+     PropT
+     Syntax
+     Utils
 .
 Import ITreeNotations.
 Open Scope itree.
@@ -89,7 +89,7 @@ Section Semantics.
       end
   .
   
-  Definition para : ccs -> ccs -> ccs :=
+  Definition para_old : ccs -> ccs -> ccs :=
     cofix F (P : ccs) (Q : ccs) := 
       branch3
         (x <- get_hd P;;
@@ -118,6 +118,34 @@ Section Semantics.
         )
   .
 
+  Definition para : ccs -> ccs -> ccs :=
+    cofix F (P : ccs) (Q : ccs) :=
+      rP <- get_hd P;; 
+      rQ <- get_hd Q;; 
+      match rP, rQ with
+      | HDone, HDone => done
+      | HDone, _ => Q
+      | _, HDone => P
+      | HAct a P', HAct b Q' =>
+        if are_opposite a b
+        then
+          branch3 (vis (Act a) (fun _ => F P' (vis (Act b) (fun _ => Q'))))
+                  (vis (Act b) (fun _ => F (vis (Act a) (fun _ => P')) Q'))
+                  (vis Synch   (fun _ => F P' Q'))
+        else
+          branch2 (vis (Act a) (fun _ => F P' (vis (Act b) (fun _ => Q'))))
+                  (vis (Act b) (fun _ => F (vis (Act a) (fun _ => P')) Q'))
+      | HAct a P', HSynch Q' =>
+        branch2 (vis (Act a) (fun _ => F P' (vis Synch (fun _ => Q'))))
+                (vis Synch   (fun _ => F (vis (Act a) (fun _ => P')) Q'))
+      | HSynch P', HAct a Q' =>
+        branch2 (vis Synch   (fun _ => F P' (vis (Act a) (fun _ => Q'))))
+                (vis (Act a) (fun _ => F (vis Synch (fun _ => P')) Q'))
+      | HSynch P', HSynch Q' =>
+        branch2 (vis Synch   (fun _ => F P' (vis Synch (fun _ => Q'))))
+                (vis Synch   (fun _ => F (vis Synch (fun _ => P')) Q'))
+      end.
+
   Definition plus : ccs -> ccs -> ccs :=
     branch2.
 
@@ -143,6 +171,15 @@ Section Semantics.
     | ParaT t1 t2   => para (model t1) (model t2)
     | PlusT t1 t2   => plus (model t1) (model t2)
     | RestrictT c t => restrict c (model t)
+    end.
+
+  Fixpoint model_old (t : term) : ccs :=
+    match t with
+    | DoneT         => done
+    | ActionT a t   => act a;; model_old t
+    | ParaT t1 t2   => para_old (model_old t1) (model_old t2)
+    | PlusT t1 t2   => plus (model_old t1) (model_old t2)
+    | RestrictT c t => restrict c (model_old t)
     end.
 
 End Semantics.

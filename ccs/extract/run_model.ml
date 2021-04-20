@@ -33,16 +33,16 @@ let step m : trace list =
 
     (* We finished the computation *)
     | RetF _ ->
-      print_string "DONE ";
+      (* print_string "DONE "; *)
       [[]]
 
     (* The only residual effect is Print, which carries just a string *)
     | VisF (Inl1 Plus, k) ->
-      print_string "Plus ";
+      (* print_string "Plus "; *)
       aux (k (Obj.magic true))
       @ aux (k (Obj.magic true))
     | VisF (Inl1 Sched, k) ->
-      print_string "Sched ";
+      (* print_string "Sched "; *)
       aux (k (Obj.magic Left))
       @ aux (k (Obj.magic Right))
       @ aux (k (Obj.magic Synchronize))
@@ -51,22 +51,23 @@ let step m : trace list =
        * @ bind s (aux (k (Obj.magic Synchronize))) *)
 
     | VisF (Inr1 (Inl1 (Send c)), k) ->
-      print_string ("!" ^ camlstring_of_coqstring c ^ " ");
+      (* print_string ("!" ^ camlstring_of_coqstring c ^ " "); *)
       bind (emit c) (aux (k (Obj.magic ())))
     | VisF (Inr1 (Inl1 (Rcv c)), k) ->
-      print_string ("?" ^ camlstring_of_coqstring c ^ " ");
+      (* print_string ("?" ^ camlstring_of_coqstring c ^ " "); *)
       bind (rcv c) (aux (k (Obj.magic ())))
 
     | VisF (Inr1 (Inr1 (Inl1 _)), k) ->
-      print_string "τ ";
+      (* print_string "τ "; *)
       bind (synch) (aux (k (Obj.magic ())))
 
     | VisF (Inr1 (Inr1 (Inr1 _)), _) ->
-      print_string "DEAD ";
+      (* print_string "DEAD "; *)
       [["dead"]]
       
   in
-  let res = List.filter (fun t -> (t == []) || (List.hd (List.rev t) != "dead")) (aux m) in print_newline () ; res
+  let res = List.filter (
+      fun t -> (t == []) || (List.hd (List.rev t) != "dead")) (aux m) in (* print_newline () ; *) res
 
 (* Main *)
 
@@ -78,16 +79,16 @@ let print_traces (ts : trace list) : unit =
   List.iter print_trace ts
 
 let () =
-  (* print_string "Run 1:\n";
-   * print_traces (step p1); *)
+  print_string "Run 1:\n";
+  print_traces (step p1);
   print_string "Run 2:\n";
   print_traces (step p2);
   print_string "Run 3:\n";
-  print_traces (step p3)
-  (* print_string "Run 4:\n"; *)
-  (* print_traces (step p4); *)
-  (* print_string "Run 5:\n"; *)
-  (* print_traces (step p5) *)
+  print_traces (step p3);
+  print_string "Run 4:\n";
+  print_traces (step p4);
+  print_string "Run 5:\n";
+  print_traces (step p5)
 
 
 
