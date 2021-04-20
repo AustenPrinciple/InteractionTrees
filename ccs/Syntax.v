@@ -38,7 +38,7 @@ Definition action_eq_dec : forall (a b : action), {a = b} + {~ a = b}.
 Defined.
 
 Definition are_opposite (a b : action) : bool :=
-  if action_eq_dec a (op a) then true else false.
+  if action_eq_dec a (op b) then true else false.
 
 Module CCSNotations.
 

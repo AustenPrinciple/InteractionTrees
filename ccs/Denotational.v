@@ -86,7 +86,8 @@ Section Semantics.
           end eq_refl
         | deadP e => dead
         end
-      end.
+      end
+  .
   
   Definition para : ccs -> ccs -> ccs :=
     cofix F (P : ccs) (Q : ccs) := 
