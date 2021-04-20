@@ -146,34 +146,3 @@ Section Semantics.
 
 End Semantics.
 
-(* From Coq Require ExtrOcamlBasic ExtrOcamlString. *)
-
-(* Extraction Language OCaml. *)
-(* Extraction Blacklist String List Char Core Z. *)
-
-(* Set Extraction AccessOpaque. *)
-
-(* Extraction "ccs.ml" model. *)
-
-(* Parameter exit_success : unit. *)
-(* Parameter exit_failure : unit. *)
-(* Extract Inlined Constant exit_success => *)
-(*   "print_endline ""OK!""; exit 0". *)
-(* Extract Inlined Constant exit_failure => *)
-(*   "print_endline ""IO test failed!""; exit 1". *)
-
-(* Definition test_io := *)
-(*   if test_interp example then *)
-(*     exit_success *)
-(*   else *)
-(*     exit_failure. *)
-
-(* Extraction "io.ml" test_io. *)
-
-(* Definition p := (model (ex 0 0)). *)
-(* Goal p ≈ p. *)
-(*   tau_steps. *)
-
-
-(* ITree.subst *)
-(* Compute prefix' 23 p . *)

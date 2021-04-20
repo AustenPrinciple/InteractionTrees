@@ -1,5 +1,9 @@
 (coq.extraction
  (prelude ExtractCCS)
- (extracted_modules Denotational)
+ (extracted_modules model)
  (theories ITree CCS)
+)
+
+(executable
+ (name run_model)
 )
