@@ -8,20 +8,32 @@ From ITree Require Import
 
 From CCS Require Import Syntax Denotational.
 
+Import CCSNotations.
+
 Extraction Language OCaml.
 Extraction Blacklist String List Char Core Z.
 
 Set Extraction AccessOpaque.
 
 (* Definition p := (model (ex DoneT DoneT)). *)
-Definition p1 := (model  DoneT).
+Definition p1 := model 0.
 
-Definition p2 := (model (ActionT (Send "a") DoneT)).
+Definition p2 := model (↑ "a" ⋅ 0 ).
 
-Definition p3 := (model (ParaT (ActionT (Send "a") DoneT) (ActionT (Rcv "a") DoneT))).
+Definition p3 := model (↑ "a" ⋅ 0 ∥ ↓ "a" ⋅ 0).
 
-Definition p4 := (model (ParaT (ActionT (Rcv "a") DoneT) (ActionT (Send "a") DoneT))).
+(* {?a !a; !a ?a; τ} *)
+Definition p4 := model (↓ "a" ⋅ 0 ∥ ↑ "a" ⋅ 0).
 
-Definition p5 := (model (ParaT (ActionT (Send "a") DoneT) (ActionT (Rcv "b") DoneT))).
+(* {?a !b; !b ?a} *)
+Definition p5 := model (↓ "a" ⋅ 0 ∥ ↑ "b" ⋅ 0).
 
-Extraction "model.ml" p1 p2 p3 p4 p5.
+(* {τ} *)
+Definition p6 := model ((↓ "a" ⋅ 0 ∥ ↑ "a" ⋅ 0) ∖ "a").
+
+(* {}
+   BUG
+ *)
+Definition p7 := model ((↓ "a" ⋅ 0 ∥ ↑ "b" ⋅ 0) ∖ "a").
+
+Extraction "model.ml" p1 p2 p3 p4 p5 p6 p7.

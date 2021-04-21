@@ -88,9 +88,10 @@ let () =
   print_string "Run 4:\n";
   print_traces (step p4);
   print_string "Run 5:\n";
-  print_traces (step p5)
-
-
-
+  print_traces (step p5);
+  print_string "Run 6:\n";
+  print_traces (step p6);
+  print_string "Run 7:\n";
+  print_traces (step p7)
 
 
