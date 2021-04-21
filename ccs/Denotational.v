@@ -26,7 +26,8 @@ Section Semantics.
 
   Variant NonDetE : Type -> Type :=
   | Plus : NonDetE bool
-  | Sched : NonDetE choice.
+  | Sched2 : NonDetE bool
+  | Sched3 : NonDetE choice.
 
   Definition DeadE := exceptE unit.
   Definition dead {A : Type} {E} `{DeadE -< E} : itree E A :=
@@ -40,15 +41,22 @@ Section Semantics.
 
   Definition act (a : action) : ccs := trigger (Act a).
 
-  Definition branch2 (P Q : ccs) : ccs :=
+  Definition plus (P Q : ccs) : ccs :=
     b <- trigger Plus;;
     match b with
     | true => P
     | false => Q
     end.
 
+  Definition branch2 (P Q : ccs) : ccs :=
+    b <- trigger Sched2;;
+    match b with
+    | true => P
+    | false => Q
+    end.
+
   Definition branch3 (P Q R : ccs) : ccs :=
-    b <- trigger Sched;;
+    b <- trigger Sched3;;
     match b with
     | Left => P
     | Right => Q
@@ -146,10 +154,7 @@ Section Semantics.
                 (vis Synch   (fun _ => F (vis Synch (fun _ => P')) Q'))
       end.
 
-  Definition plus : ccs -> ccs -> ccs :=
-    branch2.
-
-  Definition h_trigger {E F} `{E -< F} : E ~> itree F :=
+    Definition h_trigger {E F} `{E -< F} : E ~> itree F :=
     fun _ e => trigger e.
 
   Definition h_restrict (c : chan) : Handler ActionE ccsE :=

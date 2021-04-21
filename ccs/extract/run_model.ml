@@ -25,7 +25,7 @@ let s : trace = ["S"]
 let bind (t : trace) (l2 : trace list) : trace list =
   List.map (fun t' -> t @ t') l2
 
-let step m : trace list =
+let step debug m : trace list =
   let rec aux m : trace list =
     match observe m with
     (* Internal auxs compute as nothing *)
@@ -33,41 +33,51 @@ let step m : trace list =
 
     (* We finished the computation *)
     | RetF _ ->
-      (* print_string "DONE "; *)
+      if debug then print_string "DONE ";
       [[]]
 
     (* The only residual effect is Print, which carries just a string *)
     | VisF (Inl1 Plus, k) ->
-      (* print_string "Plus "; *)
+      if debug then print_string "Plus ";
       aux (k (Obj.magic true))
       @ aux (k (Obj.magic true))
-    | VisF (Inl1 Sched, k) ->
-      (* print_string "Sched "; *)
-      aux (k (Obj.magic Left))
-      @ aux (k (Obj.magic Right))
-      @ aux (k (Obj.magic Synchronize))
+    | VisF (Inl1 Sched2, k) ->
+      if debug then print_string "Sched2 ";
+      aux (k (Obj.magic true))
+      @ aux (k (Obj.magic false))
       (* bind sl (aux (k (Obj.magic Left)))
        * @ bind sr (aux (k (Obj.magic Right)))
        * @ bind s (aux (k (Obj.magic Synchronize))) *)
 
+    | VisF (Inl1 Sched3, k) ->
+      if debug then print_string "Sched3 ";
+      aux (k (Obj.magic Left))
+      @ aux (k (Obj.magic Right))
+      @ aux (k (Obj.magic Synchronize))
+    (* bind sl (aux (k (Obj.magic Left)))
+     * @ bind sr (aux (k (Obj.magic Right)))
+     * @ bind s (aux (k (Obj.magic Synchronize))) *)
+
     | VisF (Inr1 (Inl1 (Send c)), k) ->
-      (* print_string ("!" ^ camlstring_of_coqstring c ^ " "); *)
+      if debug then print_string ("!" ^ camlstring_of_coqstring c ^ " ");
       bind (emit c) (aux (k (Obj.magic ())))
     | VisF (Inr1 (Inl1 (Rcv c)), k) ->
-      (* print_string ("?" ^ camlstring_of_coqstring c ^ " "); *)
+      if debug then print_string ("?" ^ camlstring_of_coqstring c ^ " ");
       bind (rcv c) (aux (k (Obj.magic ())))
 
     | VisF (Inr1 (Inr1 (Inl1 _)), k) ->
-      (* print_string "τ "; *)
+      if debug then print_string "τ ";
       bind (synch) (aux (k (Obj.magic ())))
 
     | VisF (Inr1 (Inr1 (Inr1 _)), _) ->
-      (* print_string "DEAD "; *)
-      [["dead"]]
+      if debug then print_string "STUCK ";
+      [["stuck"]]
       
   in
-  let res = List.filter (
-      fun t -> (t == []) || (List.hd (List.rev t) != "dead")) (aux m) in (* print_newline () ; *) res
+  let res = aux m
+  in if debug then print_newline (); res
+  (* let res = List.filter (
+   *     fun t -> (t == []) || (List.hd (List.rev t) != "stuck")) (aux m) in (\* print_newline () ; *\) res *)
 
 (* Main *)
 
@@ -77,6 +87,8 @@ let print_trace (t : trace) : unit =
 
 let print_traces (ts : trace list) : unit =
   List.iter print_trace ts
+
+let step = step false 
 
 let () =
   print_string "Run 1:\n";
