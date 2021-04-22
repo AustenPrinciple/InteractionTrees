@@ -31,9 +31,9 @@ Definition p5 := model (↓ "a" ⋅ 0 ∥ ↑ "b" ⋅ 0).
 (* {τ} *)
 Definition p6 := model ((↓ "a" ⋅ 0 ∥ ↑ "a" ⋅ 0) ∖ "a").
 
-(* {}
-   BUG
- *)
+(* {} *)
 Definition p7 := model ((↓ "a" ⋅ 0 ∥ ↑ "b" ⋅ 0) ∖ "a").
 
-Extraction "model.ml" p1 p2 p3 p4 p5 p6 p7.
+Definition p8 := model (((↓ "a" ⋅ 0 ∥ ↑ "b" ⋅ 0) ∖ "a") ∥ (↓ "b" ⋅ 0)).
+
+Extraction "model.ml" p1 p2 p3 p4 p5 p6 p7 p8.

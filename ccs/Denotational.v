@@ -92,7 +92,7 @@ Section Semantics.
           | Synch => fun (Pf : T = unit) =>
                       Ret (HSynch (@eq_rect_r _ T (fun T => T -> itree ccsE unit) k unit (eq_sym Pf) tt))
           end eq_refl
-        | deadP e => dead
+        | deadP e => Ret HDone
         end
       end
   .
