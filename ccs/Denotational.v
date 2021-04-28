@@ -75,11 +75,11 @@ Section Semantics.
   Notation "'deadP' e" := (inr1 (inr1 (inr1 e))) (at level 10).
 
   Definition get_hd : ccs -> ccsT head :=
-    cofix get_hd (P : ccs) := 
+    cofix get_hd (P : ccs) :=
       match observe P with
       | RetF x => Ret HDone
       | TauF P => Tau (get_hd P)
-      | @VisF _ _ _ T e k => 
+      | @VisF _ _ _ T e k =>
         match e with
         | schedP e => vis e (fun x => get_hd (k x))
         | actP e =>
@@ -96,9 +96,9 @@ Section Semantics.
         end
       end
   .
-  
+
   Definition para_old : ccs -> ccs -> ccs :=
-    cofix F (P : ccs) (Q : ccs) := 
+    cofix F (P : ccs) (Q : ccs) :=
       branch3
         (x <- get_hd P;;
          match x with
@@ -114,8 +114,8 @@ Section Semantics.
          | HAct a Q => vis (Act a) (fun _ => F P Q)
          end
         )
-        (rP <- get_hd P;; 
-         rQ <- get_hd Q;; 
+        (rP <- get_hd P;;
+         rQ <- get_hd Q;;
          match rP,rQ with
          | HAct a P, HAct b Q =>
            if are_opposite a b
@@ -128,8 +128,8 @@ Section Semantics.
 
   Definition para : ccs -> ccs -> ccs :=
     cofix F (P : ccs) (Q : ccs) :=
-      rP <- get_hd P;; 
-      rQ <- get_hd Q;; 
+      rP <- get_hd P;;
+      rQ <- get_hd Q;;
       match rP, rQ with
       | HDone, HDone => done
       | HDone, _ => Q
@@ -154,7 +154,7 @@ Section Semantics.
                 (vis Synch   (fun _ => F (vis Synch (fun _ => P')) Q'))
       end.
 
-    Definition h_trigger {E F} `{E -< F} : E ~> itree F :=
+  Definition h_trigger {E F} `{E -< F} : E ~> itree F :=
     fun _ e => trigger e.
 
   Definition h_restrict (c : chan) : Handler ActionE ccsE :=
@@ -168,6 +168,40 @@ Section Semantics.
   Definition restrict : chan -> ccs -> ccs :=
     fun c P =>
       interp (case_ h_trigger (case_ (h_restrict c) h_trigger)) P.
+
+  Definition restrict' : chan -> ccs -> ccs.
+    refine (cofix F c P := _).
+    refine (match observe P with
+            | RetF _ => done
+            | TauF P => Tau (F c P)
+            | @VisF _ _ _ T e k =>
+              match e with
+              | schedP e => _
+              | actP e => let '(Act a) := e in
+                         match a with
+                         | Send c' | Rcv c' => if c =? c' then dead else act a
+                         end
+              | synchP e => vis e (fun x => F c (k x))
+              | deadP e => P
+              end
+            end).
+    refine (match e in NonDetE X return (T = X -> ccs) with
+            | Plus => _
+            | Sched2 => _
+            | Sched3 => _
+            end eq_refl).
+    (* plus *)
+    refine (fun (b : T = bool) => _).
+    refine (let P : ccs := _ (* F c (k true) *) in
+            let Q : ccs := _ (*F c (k false) *) in
+            match (observe P, observe Q) with
+            | (VisF (deadP _) _, VisF (deadP _) _) => dead
+            | (VisF (deadP _) _, _) => Q
+            | (_, VisF (deadP _) _) => P
+            | (_, _) => branch2 P Q
+            end).
+    (* TODO : finish this *)
+    Abort.
 
   Fixpoint model (t : term) : ccs :=
     match t with
