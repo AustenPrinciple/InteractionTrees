@@ -170,36 +170,51 @@ Section Semantics.
       interp (case_ h_trigger (case_ (h_restrict c) h_trigger)) P.
 
   Definition restrict' : chan -> ccs -> ccs.
-    refine (cofix F c P := _).
-    refine (match observe P with
-            | RetF _ => done
-            | TauF P => Tau (F c P)
-            | @VisF _ _ _ T e k =>
-              match e with
-              | schedP e => _
-              | actP e => let '(Act a) := e in
-                         match a with
-                         | Send c' | Rcv c' => if c =? c' then dead else act a
-                         end
-              | synchP e => vis e (fun x => F c (k x))
-              | deadP e => P
-              end
-            end).
+    refine (cofix F c P :=
+              match observe P with
+              | RetF _ => done
+              | TauF P => Tau (F c P)
+              | @VisF _ _ _ T e k =>
+                match e with
+                | schedP e => _
+                | actP e => let '(Act a) := e in
+                           match a with
+                           | Send c' | Rcv c' => if c =? c' then dead else act a
+                           end
+                | synchP e => vis e (fun x => F c (k x))
+                | deadP e => P
+                end
+              end).
     refine (match e in NonDetE X return (T = X -> ccs) with
-            | Plus => _
-            | Sched2 => _
-            | Sched3 => _
+            | Plus => fun (b : T = bool) =>
+                       let P : ccs := _ (* F c (k true) *) in
+                       let Q : ccs := _ (* F c (k false) *) in
+                       match (observe P, observe Q) with
+                       | (VisF (deadP _) _, VisF (deadP _) _) => dead
+                       | (VisF (deadP _) _, _) => Q
+                       | (_, VisF (deadP _) _) => P
+                       | (_, _) => branch2 P Q
+                       end
+            | Sched2 => fun (b : T = bool) =>
+                         let P : ccs := _ (* F c (k true) *) in
+                         let Q : ccs := _ (* F c (k false) *) in
+                         match (observe P, observe Q) with
+                         | (VisF (deadP _) _, VisF (deadP _) _) => dead
+                         | (VisF (deadP _) _, _) => Q
+                         | (_, VisF (deadP _) _) => P
+                         | (_, _) => branch2 P Q
+                         end
+            | Sched3 => fun (b : T = choice) =>
+                         let P : ccs := _ (* F c (k Left) *) in
+                         let Q : ccs := _ (* F c (k Right) *) in
+                         let R : ccs := _ (* F c (k Synchronize) *) in
+                         match (observe P, observe Q, observe R) with
+                         | (VisF (deadP _) _, VisF (deadP _) _, VisF (deadP _) _) => dead
+                         (* this means there has been an internal communication on a restricted channel *)
+                         | (VisF (deadP _) _, VisF (deadP_ ) _, _) => R
+                         | (_, _, _) => branch3 P Q R
+                         end
             end eq_refl).
-    (* plus *)
-    refine (fun (b : T = bool) => _).
-    refine (let P : ccs := _ (* F c (k true) *) in
-            let Q : ccs := _ (*F c (k false) *) in
-            match (observe P, observe Q) with
-            | (VisF (deadP _) _, VisF (deadP _) _) => dead
-            | (VisF (deadP _) _, _) => Q
-            | (_, VisF (deadP _) _) => P
-            | (_, _) => branch2 P Q
-            end).
     (* TODO : finish this *)
     Abort.
 
