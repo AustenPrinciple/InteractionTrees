@@ -179,7 +179,10 @@ Section Semantics.
                 | schedP e => _
                 | actP e => let '(Act a) := e in
                            match a with
-                           | Send c' | Rcv c' => if c =? c' then dead else act a
+                           | Send c' | Rcv c' => if c =? c' then
+                                                  dead
+                                                else
+                                                  vis e k
                            end
                 | synchP e => vis e (fun x => F c (k x))
                 | deadP e => P
@@ -211,10 +214,11 @@ Section Semantics.
                          match (observe P, observe Q, observe R) with
                          | (VisF (deadP _) _, VisF (deadP _) _, VisF (deadP _) _) => dead
                          (* this means there has been an internal communication on a restricted channel *)
-                         | (VisF (deadP _) _, VisF (deadP_ ) _, _) => R
+                         | (VisF (deadP _) _, VisF (deadP _) _, _) => R
                          | (_, _, _) => branch3 P Q R
                          end
             end eq_refl).
+    Guarded.
     (* TODO : finish this *)
     Abort.
 
