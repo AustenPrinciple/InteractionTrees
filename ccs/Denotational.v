@@ -240,5 +240,43 @@ Section Semantics.
     | RestrictT c t => restrict c (model_old t)
     end.
 
+
+  Inductive step : ccs -> action -> ccs -> Prop :=
+  (* Tau *)
+  | S_Tau : forall a P Q, step P a Q -> step (Tau P) a Q
+  (* Simple action *)
+  | S_Vis_Act : forall a P, step (Vis (actP (Act a)) P) a (P tt)
+  (* Synchronisation *)
+  | S_Vis_Synch : forall a P Q, step P a Q -> step (Vis (synchP Synch) (fun _ => P)) a Q
+  (* Choice *)
+  | S_Vis_Plus_L : forall a L L' R,
+      step L a L' -> step (Vis (schedP Plus) (fun (b: bool) => if b then L else R)) a L'
+  | S_Vis_Plus_R : forall a L R R',
+      step R a R' -> step (Vis (schedP Plus) (fun (b: bool) => if b then L else R)) a R'
+  (* Two-way parallelism *)
+  | S_Vis_Sched2_L : forall a L L' R,
+      step L a L' -> step (Vis (schedP Sched2) (fun (b: bool) => if b then L else R)) a L'
+  | S_Vis_Sched2_R : forall a L R R',
+      step R a R' -> step (Vis (schedP Sched2) (fun (b: bool) => if b then L else R)) a R'
+  (* Three-way parallelism *)
+  | S_Vis_Sched3_L : forall a L L' M R,
+      step L a L' -> step (Vis (schedP Sched3) (fun c => match c with
+                                                     | Left => L
+                                                     | Synchronize => M
+                                                     | Right => R
+                                                     end)) a L'
+  | S_Vis_Sched3_M : forall a L M M' R,
+      step M a M' -> step (Vis (schedP Sched3) (fun c => match c with
+                                                     | Left => L
+                                                     | Synchronize => M
+                                                     | Right => R
+                                                     end)) a M'
+  | S_Vis_Sched3_R : forall a L M R R',
+      step R a R' -> step (Vis (schedP Sched3) (fun c => match c with
+                                                     | Left => L
+                                                     | Synchronize => M
+                                                     | Right => R
+                                                     end)) a R'.
+
 End Semantics.
 
