@@ -241,13 +241,15 @@ Section Semantics.
     end.
 
 
-  Inductive step : ccs -> action -> ccs -> Prop :=
+  (** A term can advance in a single step producing either an action or a synchronisation,
+   *  encoded here as None *)
+  Inductive step : ccs -> option action -> ccs -> Prop :=
   (* Tau *)
   | S_Tau : forall a P Q, step P a Q -> step (Tau P) a Q
   (* Simple action *)
-  | S_Vis_Act : forall a P, step (Vis (actP (Act a)) P) a (P tt)
+  | S_Vis_Act : forall a P, step (Vis (actP (Act a)) P) (Some a) (P tt)
   (* Synchronisation *)
-  | S_Vis_Synch : forall a P Q, step P a Q -> step (Vis (synchP Synch) (fun _ => P)) a Q
+  | S_Vis_Synch : forall P, step (Vis (synchP Synch) (fun _ => P)) None P
   (* Choice *)
   | S_Vis_Plus_L : forall a L L' R,
       step L a L' -> step (Vis (schedP Plus) (fun (b: bool) => if b then L else R)) a L'
