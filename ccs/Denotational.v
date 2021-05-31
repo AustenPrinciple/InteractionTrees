@@ -280,5 +280,31 @@ Section Semantics.
                                                      | Right => R
                                                      end)) a R'.
 
+  CoInductive bisim : ccs -> ccs -> Prop :=
+   BiSim : forall P Q, ((forall a P', step P a P' -> exists Q', step Q a Q' /\ bisim P' Q')
+            /\ (forall a Q', step Q a Q' -> exists P', step P a P' /\ bisim P' Q'))
+           -> bisim P Q.
+
+  Theorem bisim_refl: forall P, bisim P P.
+    cofix H.
+    apply H.
+  Admitted.
+
+  Lemma example1: bisim (Tau done) (Tau (Tau done)).
+  Proof.
+    apply BiSim.
+    split; intros.
+    - exists P'.
+      split.
+      + constructor.
+        assumption.
+      + apply bisim_refl.
+    - exists Q'.
+      split.
+      + inversion H.
+        assumption.
+      + apply bisim_refl.
+  Qed.
+
 End Semantics.
 
