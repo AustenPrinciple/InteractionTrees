@@ -287,8 +287,9 @@ Section Semantics.
 
   Theorem bisim_refl: forall P, bisim P P.
     cofix H.
-    apply H.
-  Admitted.
+    constructor.
+    split; eauto.
+  Qed.
 
   Lemma example1: bisim (Tau done) (Tau (Tau done)).
   Proof.
