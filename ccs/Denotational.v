@@ -15,6 +15,8 @@ Open Scope itree.
 Import CCSNotations.
 Open Scope ccs_scope.
 
+From Paco Require Import paco.
+
 Section Semantics.
 
   Variant ActionE : Type -> Type :=
@@ -281,29 +283,100 @@ Section Semantics.
                                                      end)) a R'.
 
   CoInductive bisim : ccs -> ccs -> Prop :=
-   BiSim : forall P Q, ((forall a P', step P a P' -> exists Q', step Q a Q' /\ bisim P' Q')
-            /\ (forall a Q', step Q a Q' -> exists P', step P a P' /\ bisim P' Q'))
-           -> bisim P Q.
+    BiSim : forall P Q,
+      ((forall a P' (PStep : step P a P' : Prop), exists Q', step Q a Q' /\ bisim P' Q')
+       /\ (forall a Q' (QStep : step Q a Q' : Prop), exists P', step P a P' /\ bisim P' Q'))
+      -> bisim P Q.
+
+  (* Paco stuff *)
+  Inductive bisim_gen bisim : ccs -> ccs -> Prop :=
+    _bisim_gen : forall P Q (R: bisim P Q : Prop),
+      ((forall a P', step P a P' -> exists Q', step Q a Q' /\ bisim_gen bisim P' Q')
+       /\ (forall a Q', step Q a Q' -> exists P', step P a P' /\ bisim_gen bisim P' Q'))
+      -> bisim_gen bisim P Q.
+  Hint Constructors bisim_gen : core.
+
+  Definition bisim' P Q : Prop := paco2 bisim_gen bot2 P Q.
+  Hint Unfold bisim' : core.
+
+  Lemma bisim_gen_mon : monotone2 bisim_gen.
+  Proof.
+    unfold monotone2.
+    intros.
+    inversion IN; subst.
+    destruct H as [Hx0 Hx1].
+    apply LE in R as R'.
+    (* need to prove bisim_gen r' _ _
+     * we have
+     * r x y | r' x y | bisim_gen r x y
+     *)
+    econstructor.
+    - now apply LE.
+    - split; intros.
+      + apply Hx0 in H as H2.
+        elim H2.
+        intros.
+        exists x.
+        split; destruct H0.
+        * assumption.
+        * (* here we have to prove bisim_gen r' _ _ again... *)
+  Abort.
 
   Theorem bisim_refl: forall P, bisim P P.
+  Proof.
     cofix H.
     constructor.
     split; eauto.
   Qed.
 
+  Theorem bisim_refl': forall P, bisim' P P.
+  Proof.
+    pcofix H.
+    econstructor.
+    (* This produces weird goals *)
+  Abort.
+
+  Theorem bisim_commu: forall P Q, bisim P Q -> bisim Q P.
+  Proof.
+    cofix H.
+    constructor.
+    split;
+      intros;
+      apply H in H0;
+      (* Guarded. succeeds *)
+      inversion H0;
+      (* Guarded. fails *)
+      now apply H1.
+  Abort.
+
+  Theorem bisim_trans: forall P Q R, bisim P Q -> bisim Q R -> bisim P R.
+  Proof.
+    cofix H.
+    constructor.
+    apply H with (P := P) in H1 as H2.
+    split; intros.
+    - Guarded.
+      inversion H2.
+      (* Guarded. fails *)
+      destruct H3.
+      now apply H3 in PStep.
+    - inversion H2.
+      destruct H3.
+      now apply H6 in QStep.
+    - assumption.
+  Abort.
+
   Lemma example1: bisim (Tau done) (Tau (Tau done)).
   Proof.
-    apply BiSim.
+    constructor.
     split; intros.
     - exists P'.
       split.
-      + constructor.
-        assumption.
+      + now constructor.
       + apply bisim_refl.
     - exists Q'.
       split.
-      + inversion H.
-        assumption.
+      + now inversion QStep.
       + apply bisim_refl.
   Qed.
 
