@@ -290,7 +290,7 @@ Section Semantics.
 
   (* Paco stuff *)
   Variant bisim_gen bisim : ccs -> ccs -> Prop :=
-    _bisim_gen : forall P Q (R: bisim P Q : Prop),
+    _bisim_gen : forall P Q,
       ((forall a P', step P a P' -> exists Q', step Q a Q' /\ bisim P' Q')
        /\ (forall a Q', step Q a Q' -> exists P', step P a P' /\ bisim P' Q'))
       -> bisim_gen bisim P Q.
@@ -306,16 +306,16 @@ Section Semantics.
     inversion IN; subst.
     destruct H as [Hx0 Hx1].
     econstructor.
-    - now apply LE.
-    - split;
-        intros;
-        (apply Hx0 in H || apply Hx1 in H);
-        elim H;
-        intros;
-        exists x;
-        destruct H0;
-        eauto.
+    split;
+      intros;
+      (apply Hx0 in H || apply Hx1 in H);
+      elim H;
+      intros;
+      exists x;
+      destruct H0;
+      eauto.
   Qed.
+  Hint Resolve bisim_gen_mon : paco.
 
   Theorem bisim_refl: forall P, bisim P P.
   Proof.
@@ -327,9 +327,11 @@ Section Semantics.
   Theorem bisim_refl': forall P, bisim' P P.
   Proof.
     pcofix H.
+    intros.
+    pfold.
     econstructor.
-    (* This produces weird goals *)
-  Abort.
+    split; eauto.
+  Qed.
 
   Theorem bisim_commu: forall P Q, bisim P Q -> bisim Q P.
   Proof.
