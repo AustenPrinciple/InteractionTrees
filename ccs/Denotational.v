@@ -291,8 +291,8 @@ Section Semantics.
   (* Paco stuff *)
   Variant bisim_gen bisim : ccs -> ccs -> Prop :=
     _bisim_gen : forall P Q,
-      ((forall a P', step P a P' -> exists Q', step Q a Q' /\ bisim P' Q')
-       /\ (forall a Q', step Q a Q' -> exists P', step P a P' /\ bisim P' Q'))
+      ((forall a P' (PStep : step P a P' : Prop), exists Q', step Q a Q' /\ bisim P' Q')
+       /\ (forall a Q' (QStep : step Q a Q' : Prop), exists P', step P a P' /\ bisim P' Q'))
       -> bisim_gen bisim P Q.
   Hint Constructors bisim_gen : core.
 
@@ -308,11 +308,9 @@ Section Semantics.
     econstructor.
     split;
       intros;
-      (apply Hx0 in H || apply Hx1 in H);
-      elim H;
-      intros;
-      exists x;
-      destruct H0;
+      (apply Hx0 in PStep as [x' [xStep RPQ]] ||
+       apply Hx1 in QStep as [x' [xStep RPQ]]);
+      exists x';
       eauto.
   Qed.
   Hint Resolve bisim_gen_mon : paco.
@@ -372,19 +370,21 @@ Section Semantics.
 
   Theorem bisim_trans: forall P Q R, bisim P Q -> bisim Q R -> bisim P R.
   Proof.
-    cofix H.
+    cofix CIH.
+    intros P Q R HPQ HQR.
     constructor.
-    apply H with (P := P) in H1 as H2.
-    split; intros.
-    - Guarded.
-      inversion H2.
+    apply CIH with (P := P) in HQR as HPR.
+    2: apply HPQ.
+    split.
+    - intros.
+      inversion HPR; subst.
       (* Guarded. fails *)
-      destruct H3.
-      now apply H3 in PStep.
-    - inversion H2.
-      destruct H3.
-      now apply H6 in QStep.
-    - assumption.
+      destruct H as [QSimP _].
+      now apply QSimP in PStep.
+    - intros a R' RStep.
+      inversion HPR; subst.
+      destruct H as [_ PSimR].
+      now apply PSimR in RStep.
   Abort.
 
   Lemma example1: bisim (Tau done) (Tau (Tau done)).
