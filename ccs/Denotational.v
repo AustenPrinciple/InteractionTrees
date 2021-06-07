@@ -434,5 +434,22 @@ Section Semantics.
       + apply bisim_refl.
   Qed.
 
+  Lemma example1': bisim' (Tau done) (Tau (Tau done)).
+  Proof.
+    pfold.
+    econstructor.
+    split; intros.
+    - exists P'.
+      split.
+      + now econstructor.
+      + econstructor.
+        apply bisim_refl'.
+    - exists Q'.
+      split.
+      + now inversion QStep.
+      + econstructor.
+        apply bisim_refl'.
+  Qed.
+
 End Semantics.
 
