@@ -335,16 +335,40 @@ Section Semantics.
 
   Theorem bisim_commu: forall P Q, bisim P Q -> bisim Q P.
   Proof.
-    cofix H.
+    cofix CIH.
+    intros P Q HPQ.
+    inversion HPQ; subst.
+    destruct H as [QSimP PSimQ].
     constructor.
-    split;
-      intros;
-      apply H in H0;
-      (* Guarded. succeeds *)
-      inversion H0;
-      (* Guarded. fails *)
-      now apply H1.
-  Abort.
+    split.
+    - intros a Q' QStep.
+      apply PSimQ in QStep as [P' [PStep H'PQ]].
+      eauto.
+    - intros a P' PStep.
+      apply QSimP in PStep as [Q' [QStep H'PQ]].
+      eauto.
+  Qed.
+
+  Theorem bisim_commu': forall P Q, bisim' P Q -> bisim' Q P.
+  Proof.
+    pcofix CIH.
+    intros P Q HPQ.
+    pinversion HPQ; subst.
+    destruct H as [QSimP PSimQ].
+    pfold.
+    econstructor.
+    split.
+    - intros a Q' QStep.
+      apply PSimQ in QStep as [P' [PStep H'PQ]].
+      pclearbot. (* in H'PQ *)
+      exists P'.
+      eauto.
+    - intros a P' PStep.
+      apply QSimP in PStep as [Q' [QStep H'PQ]].
+      pclearbot. (* in H'PQ *)
+      exists Q'.
+      eauto.
+  Qed.
 
   Theorem bisim_trans: forall P Q R, bisim P Q -> bisim Q R -> bisim P R.
   Proof.
