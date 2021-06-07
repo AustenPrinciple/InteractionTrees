@@ -387,6 +387,39 @@ Section Semantics.
       now apply PSimR in RStep.
   Abort.
 
+  Theorem bisim_trans': forall P Q R, bisim' P Q -> bisim' Q R -> bisim' P R.
+  Proof.
+    pcofix CIH.
+    intros P Q R HPQ HQR.
+    apply CIH with (P := P) in HQR as HPR.
+    2: apply HPQ.
+    pfold.
+    econstructor.
+    split.
+    (* the reasoning behind both branches is roughly the same,
+       but the order changes so I can't merge them neatly *)
+    - intros a P' PStep.
+      pinversion HPQ; subst.
+      destruct H as [QSimP _].
+      apply QSimP in PStep as [Q' [QStep H'PQ]].
+      pinversion HQR; subst.
+      destruct H as [RSimQ _].
+      apply RSimQ in QStep as [R' [RStep H'QR]].
+      pclearbot. (* in H'QR *)
+      exists R'.
+      eauto.
+    - intros a R' RStep.
+      pinversion HQR; subst.
+      destruct H as [_ QSimR].
+      apply QSimR in RStep as [Q' [QStep H'PR]].
+      pinversion HPQ; subst.
+      destruct H as [_ PSimQ].
+      apply PSimQ in QStep as [P' [PStep H'PQ]].
+      pclearbot. (* in H'PQ *)
+      exists P'.
+      eauto.
+  Qed.
+
   Lemma example1: bisim (Tau done) (Tau (Tau done)).
   Proof.
     constructor.
