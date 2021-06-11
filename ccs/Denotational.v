@@ -282,17 +282,18 @@ Section Semantics.
                                                      | Right => R
                                                      end)) a R'.
 
-  CoInductive bisim : ccs -> ccs -> Prop :=
+  (* CoInductive bisim : ccs -> ccs -> Prop :=
     BiSim : forall P Q,
-      ((forall a P' (PStep : step P a P' : Prop), exists Q', step Q a Q' /\ bisim P' Q')
-       /\ (forall a Q' (QStep : step Q a Q' : Prop), exists P', step P a P' /\ bisim P' Q'))
+      ((forall a P' (PStep : step P a P'), exists Q', step Q a Q' /\ bisim P' Q')
+       /\ (forall a Q' (QStep : step Q a Q'), exists P', step P a P' /\ bisim P' Q'))
       -> bisim P Q.
+ *)
 
   (* Paco stuff *)
   Variant bisim_gen bisim : ccs -> ccs -> Prop :=
     _bisim_gen : forall P Q,
-      ((forall a P' (PStep : step P a P' : Prop), exists Q', step Q a Q' /\ bisim P' Q')
-       /\ (forall a Q' (QStep : step Q a Q' : Prop), exists P', step P a P' /\ bisim P' Q'))
+      ((forall a P' (PStep : step P a P'), exists Q', step Q a Q' /\ bisim P' Q')
+       /\ (forall a Q' (QStep : step Q a Q'), exists P', step P a P' /\ bisim P' Q'))
       -> bisim_gen bisim P Q.
   Hint Constructors bisim_gen : core.
 
@@ -453,3 +454,50 @@ Section Semantics.
 
 End Semantics.
 
+
+From CCS Require Import
+  Operational.
+
+Section EquivSem.
+
+  Notation step_ccs := Denotational.step.
+  Notation step_op  := Operational.step.
+
+  (* Lifting the operational stepping over itrees to the syntax
+  via representation *)
+  Definition step_sem : term -> option action -> term -> Prop :=
+    fun t1 ma t2 => step_ccs (model t1) ma (model t2).
+
+  (* Lock-step bisimulation between terms and [ccs] *)
+  Variant bisimF bisim : term -> term -> Prop :=
+    _bisimF : forall P Q,
+      ((forall a P' (PStep : step_op P a P'), 
+         exists Q', step_sem Q a Q' /\ bisim P' Q')
+       /\ (forall a Q' (QStep : step_sem Q a Q'),
+         exists P', step_op P a P' /\ bisim P' Q'))
+      -> bisimF bisim P Q.
+  Hint Constructors bisimF : core.
+
+  Definition bisim := paco2 bisimF bot2.
+  Hint Unfold bisim : core.
+
+  Theorem model_correct_complete :
+    forall P, bisim P P.
+  Proof.
+    pcofix CIH; intros P.
+    pfold; constructor.
+    split.
+    - (* The denotational side can simulate the operational semantics *)
+      intros a P' STEPOP.
+      exists P'; split; [ | auto].
+      admit.
+    - (* The operational side can simulate the denotational semantics *)
+      intros a P' STEPSEM.
+      exists P'; split; [| auto].
+     admit.
+
+    
+
+  Admitted.
+
+End EquivSem.
