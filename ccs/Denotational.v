@@ -247,47 +247,35 @@ Section Semantics.
    *  encoded here as None *)
   Inductive step : ccs -> option action -> ccs -> Prop :=
   (* Tau *)
-  | S_Tau : forall a P Q, step P a Q -> step (Tau P) a Q
+  | S_Tau_add : forall a P Q, step P a Q -> step (Tau P) a Q
+  | S_Tau_remove : forall a P Q, step (Tau P) a Q -> step P a Q
   (* Simple action *)
-  | S_Vis_Act : forall a P, step (Vis (actP (Act a)) P) (Some a) (P tt)
+  | S_Vis_Act : forall a P, step (act a ;; P) (Some a) P
   (* Synchronisation *)
-  | S_Vis_Synch : forall P, step (Vis (synchP Synch) (fun _ => P)) None P
+  | S_Vis_Synch : forall P, step (trigger Synch ;; P) None P
   (* Choice *)
   | S_Vis_Plus_L : forall a L L' R,
-      step L a L' -> step (Vis (schedP Plus) (fun (b: bool) => if b then L else R)) a L'
+      step L a L' -> step (plus L R) a L'
   | S_Vis_Plus_R : forall a L R R',
-      step R a R' -> step (Vis (schedP Plus) (fun (b: bool) => if b then L else R)) a R'
+      step R a R' -> step (plus L R) a R'
   (* Two-way parallelism *)
   | S_Vis_Sched2_L : forall a L L' R,
-      step L a L' -> step (Vis (schedP Sched2) (fun (b: bool) => if b then L else R)) a L'
+      step L a L' -> step (branch2 L R) a (branch2 L' R)
   | S_Vis_Sched2_R : forall a L R R',
-      step R a R' -> step (Vis (schedP Sched2) (fun (b: bool) => if b then L else R)) a R'
+      step R a R' -> step (branch2 L R) a (branch2 L R')
   (* Three-way parallelism *)
-  | S_Vis_Sched3_L : forall a L L' M R,
-      step L a L' -> step (Vis (schedP Sched3) (fun c => match c with
-                                                     | Left => L
-                                                     | Synchronize => M
-                                                     | Right => R
-                                                     end)) a L'
-  | S_Vis_Sched3_M : forall a L M M' R,
-      step M a M' -> step (Vis (schedP Sched3) (fun c => match c with
-                                                     | Left => L
-                                                     | Synchronize => M
-                                                     | Right => R
-                                                     end)) a M'
-  | S_Vis_Sched3_R : forall a L M R R',
-      step R a R' -> step (Vis (schedP Sched3) (fun c => match c with
-                                                     | Left => L
-                                                     | Synchronize => M
-                                                     | Right => R
-                                                     end)) a R'.
+  | S_Vis_Sched3_L : forall a L L' R S,
+      step L a L' -> step (branch3 L R S) a (branch3 L' R S)
+  | S_Vis_Sched3_R : forall a L R R' S,
+      step R a R' -> step (branch3 L R S) a (branch3 L R' S)
+  | S_Vis_Sched3_S : forall a L R S S',
+      step S a S' -> step (branch3 L R S) a (branch3 L R S').
 
-  (* CoInductive bisim : ccs -> ccs -> Prop :=
+  CoInductive bisim_old : ccs -> ccs -> Prop :=
     BiSim : forall P Q,
-      ((forall a P' (PStep : step P a P'), exists Q', step Q a Q' /\ bisim P' Q')
-       /\ (forall a Q' (QStep : step Q a Q'), exists P', step P a P' /\ bisim P' Q'))
-      -> bisim P Q.
- *)
+      ((forall a P' (PStep : step P a P'), exists Q', step Q a Q' /\ bisim_old P' Q')
+       /\ (forall a Q' (QStep : step Q a Q'), exists P', step P a P' /\ bisim_old P' Q'))
+      -> bisim_old P Q.
 
   (* Paco stuff *)
   Variant bisim_gen bisim : ccs -> ccs -> Prop :=
