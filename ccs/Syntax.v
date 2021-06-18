@@ -24,7 +24,7 @@ Section Syntax.
   | ParaT (P1 P2 : term)
   | PlusT (P1 P2 : term)
   | RestrictT (c : chan) (P : term).
-  
+
 End Syntax.
 
 Definition op (a : action) : action :=

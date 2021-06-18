@@ -6,7 +6,7 @@ From ITree Require Import
 Inductive Fitree {E : Type -> Type} {X : Type} : Type :=
 | FBot : Fitree
 | FRet : X -> Fitree
-| FTau : Fitree -> Fitree 
+| FTau : Fitree -> Fitree
 | FVis {Y} : E Y -> (Y -> Fitree) -> Fitree
 .
 Arguments Fitree : clear implicits.

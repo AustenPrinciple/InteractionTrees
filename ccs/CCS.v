@@ -79,7 +79,7 @@ Section Representation.
   Variant CallProcessE : Type -> Type :=
   | CallProcess (p : pid) : CallProcessE unit.
 
-  Definition FailureE := exceptE string.  
+  Definition FailureE := exceptE string.
 
   Definition E := CallProcessE +' CommE +' SchedE +' FailureE.
 
