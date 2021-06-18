@@ -242,13 +242,11 @@ Section Semantics.
     | RestrictT c t => restrict c (model_old t)
     end.
 
-
   (** A term can advance in a single step producing either an action or a synchronisation,
    *  encoded here as None *)
   Inductive step : ccs -> option action -> ccs -> Prop :=
   (* Tau *)
   | S_Tau_add : forall a P Q, step P a Q -> step (Tau P) a Q
-  | S_Tau_remove : forall a P Q, step (Tau P) a Q -> step P a Q
   (* Simple action *)
   | S_Vis_Act : forall a P, step (act a ;; P) (Some a) P
   (* Synchronisation *)
@@ -413,33 +411,50 @@ Section Semantics.
       exists P'.
       eauto.
   Qed.
-
+(* 
   Lemma example1: bisim_old (act (↓ "a") ;; done)
                             (Tau (act (↓ "a");; done)).
   Proof.
     constructor.
+    split.
+    - intros.
+      exists P'.
+      split.
+
     split;
       intros a X' XStep;
       exists X';
       split;
       ( apply bisim_refl || now constructor).
-  Qed.
+  Qed. *)
+
+Lemma step_tau_inv : 
+forall P a Q, step (Tau P) a Q -> step P a Q.
+Proof.  
+  intros.
+  inversion H; subst; auto.
+
+  apply eqit_inv in H1. empt
+  all: admit.
+Admitted.
 
   Lemma example1': bisim' (act (↓ "a") ;; done)
                           (Tau (act (↓ "a");; done)).
   Proof.
-    pfold.
-    econstructor.
-    split;
-      intros a X' XStep;
-      exists X';
-      split;
-      econstructor;
-      (apply bisim_refl' || assumption).
+    pfold. 
+    constructor.
+    split.
+    - intros.
+      exists P'.
+      split; [| left; apply bisim_refl'].
+      constructor; auto.
+    - intros.
+      exists Q'.
+      split; [| left; apply bisim_refl'].
+      apply step_tau_inv; auto.
   Qed.
-
-End Semantics.
-
+  
+  End Semantics.
 
 From CCS Require Import
   Operational.
@@ -490,7 +505,9 @@ Section EquivSem.
     inversion H.
   Qed.
 
-  Lemma bisim_para : forall P Q R, bisim P Q -> bisim (P ∥ R) (Q ∥ R).
+  Lemma bisim_para : forall P Q R, 
+   bisim P Q ->
+   bisim (P ∥ R) (Q ∥ R).
   Proof.
     pcofix CIH.
     intros.
@@ -511,25 +528,50 @@ Section EquivSem.
     split.
     - (* The denotational side can simulate the operational semantics *)
       intros a Po StepOp.
-      induction StepOp.
-      + exists P.
-        split;
-          [apply S_Vis_Act | auto].
-      + destruct IHStepOp as [Ps [StepSem R]].
-        exists Ps.
-        split; [now apply S_Vis_Plus_L | auto].
-      + rename Q' into Qo.
-        destruct IHStepOp as [Qs [StepSem R]].
-        exists Qs.
-        split; [now apply S_Vis_Plus_R | auto].
-      + rename P' into Po.
+      exists Po.
+      split; [| right; auto].
+      clear CIH r.
+      induction StepOp; try now constructor.
+      + clear StepOp.
+        unfold step_sem. 
+        cbn.
+        red in IHStepOp.
+  admit.        
+        (* 
+           step_ccs (model P) !b ∅ 
+
+           get_hd (choice2 (true -> !a ; false -> !b))
+
+           choice2 (true -> !a,∅; false -> !b,∅
+
+           step_ccs (model P) a (model P') est un chemin
+           dans get_hd (model P) qui mène à la feuille (a,model P')
+           ~> "step_ccs like (get_hd (model P)) a (model P')"
+
+           step_ccs (model P) explore un chemin prefix de choices de (model P)
+           step_ccs (para (model P) (model Q))
+              explore le même chemin prefix de choices, 
+              mais dans l'arbre prefix get_hd (model P)
+
+            )
+
+          para t u :
+           a,k <- get_hd t; a',k' <- get_hd u ;
+           choice3
+
+
+        *)
+
+
+(* 
+      rename P' into Po.
         destruct IHStepOp as [Ps [StepSem R]].
         exists (Ps ∥ Q).
         split.
         * Print S_Vis_Sched2_L.
           admit.
-        * admit.
-      + admit.
+        * admit. *)
+      + admit. 
       + admit.
       + admit.
 
