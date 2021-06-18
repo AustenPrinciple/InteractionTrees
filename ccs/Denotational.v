@@ -304,7 +304,7 @@ Section Semantics.
   Qed.
   Hint Resolve bisim_gen_mon : paco.
 
-  Theorem bisim_refl: forall P, bisim P P.
+  Theorem bisim_refl: forall P, bisim_old P P.
   Proof.
     cofix H.
     constructor.
@@ -320,7 +320,7 @@ Section Semantics.
     split; eauto.
   Qed.
 
-  Theorem bisim_commu: forall P Q, bisim P Q -> bisim Q P.
+  Theorem bisim_commu: forall P Q, bisim_old P Q -> bisim_old Q P.
   Proof.
     cofix CIH.
     intros P Q HPQ.
@@ -357,24 +357,29 @@ Section Semantics.
       eauto.
   Qed.
 
-  Theorem bisim_trans: forall P Q R, bisim P Q -> bisim Q R -> bisim P R.
+  Theorem bisim_trans: forall P Q R, bisim_old P Q -> bisim_old Q R -> bisim_old P R.
   Proof.
     cofix CIH.
     intros P Q R HPQ HQR.
     constructor.
-    apply CIH with (P := P) in HQR as HPR.
-    2: apply HPQ.
     split.
     - intros.
-      inversion HPR; subst.
-      (* Guarded. fails *)
+      inversion HPQ; subst.
       destruct H as [QSimP _].
-      now apply QSimP in PStep.
+      apply QSimP in PStep as [Q' [QStep H'PQ]].
+      inversion HQR; subst.
+      destruct H as [RSimQ _].
+      apply RSimQ in QStep as [R' [RStep H'QR]].
+      eauto.
     - intros a R' RStep.
-      inversion HPR; subst.
-      destruct H as [_ PSimR].
-      now apply PSimR in RStep.
-  Abort.
+      inversion HQR; subst.
+      destruct H as [_ QSimR].
+      apply QSimR in RStep as [Q' [QStep H'QR]].
+      inversion HPQ; subst.
+      destruct H as [_ PSimQ].
+      apply PSimQ in QStep as [P' [PStep H'PQ]].
+      eauto.
+  Qed.
 
   Theorem bisim_trans': forall P Q R, bisim' P Q -> bisim' Q R -> bisim' P R.
   Proof.
@@ -409,35 +414,28 @@ Section Semantics.
       eauto.
   Qed.
 
-  Lemma example1: bisim (Tau done) (Tau (Tau done)).
+  Lemma example1: bisim_old (act (↓ "a") ;; done)
+                            (Tau (act (↓ "a");; done)).
   Proof.
     constructor.
-    split; intros.
-    - exists P'.
-      split.
-      + now constructor.
-      + apply bisim_refl.
-    - exists Q'.
-      split.
-      + now inversion QStep.
-      + apply bisim_refl.
+    split;
+      intros a X' XStep;
+      exists X';
+      split;
+      ( apply bisim_refl || now constructor).
   Qed.
 
-  Lemma example1': bisim' (Tau done) (Tau (Tau done)).
+  Lemma example1': bisim' (act (↓ "a") ;; done)
+                          (Tau (act (↓ "a");; done)).
   Proof.
     pfold.
     econstructor.
-    split; intros.
-    - exists P'.
-      split.
-      + now econstructor.
-      + econstructor.
-        apply bisim_refl'.
-    - exists Q'.
-      split.
-      + now inversion QStep.
-      + econstructor.
-        apply bisim_refl'.
+    split;
+      intros a X' XStep;
+      exists X';
+      split;
+      econstructor;
+      (apply bisim_refl' || assumption).
   Qed.
 
 End Semantics.
@@ -459,33 +457,86 @@ Section EquivSem.
   (* Lock-step bisimulation between terms and [ccs] *)
   Variant bisimF bisim : term -> term -> Prop :=
     _bisimF : forall P Q,
-      ((forall a P' (PStep : step_op P a P'), 
-         exists Q', step_sem Q a Q' /\ bisim P' Q')
+      ((forall a P' (PStep : step_op P a P'),
+           exists Q', step_sem Q a Q' /\ bisim P' Q')
        /\ (forall a Q' (QStep : step_sem Q a Q'),
-         exists P', step_op P a P' /\ bisim P' Q'))
+             exists P', step_op P a P' /\ bisim P' Q'))
       -> bisimF bisim P Q.
   Hint Constructors bisimF : core.
 
   Definition bisim := paco2 bisimF bot2.
   Hint Unfold bisim : core.
 
+  Lemma bisimF_mon : monotone2 bisimF.
+  Proof.
+    unfold monotone2.
+    intros.
+    inversion IN; subst.
+    destruct H as [StepOp StepSem].
+    econstructor.
+    split; intros.
+    - apply StepOp in PStep as [Q' [Sem2 RPQ]].
+      eauto.
+    - apply StepSem in QStep as [P' [Op2 RPQ]].
+      eauto.
+  Qed.
+
+  Hint Resolve bisimF_mon : paco.
+
+  Lemma no_step_done : forall a P, not (step_op 0 a P).
+  Proof.
+    unfold not.
+    intros.
+    inversion H.
+  Qed.
+
+  Lemma bisim_para : forall P Q R, bisim P Q -> bisim (P ∥ R) (Q ∥ R).
+  Proof.
+    pcofix CIH.
+    intros.
+    pfold.
+    econstructor.
+    split; intros.
+    - inversion PStep; subst.
+      + punfold H0.
+  Abort.
+
   Theorem model_correct_complete :
     forall P, bisim P P.
   Proof.
-    pcofix CIH; intros P.
-    pfold; constructor.
+    pcofix CIH.
+    intros P.
+    pfold.
+    econstructor.
     split.
     - (* The denotational side can simulate the operational semantics *)
-      intros a P' STEPOP.
-      exists P'; split; [ | auto].
-      admit.
+      intros a Po StepOp.
+      induction StepOp.
+      + exists P.
+        split;
+          [apply S_Vis_Act | auto].
+      + destruct IHStepOp as [Ps [StepSem R]].
+        exists Ps.
+        split; [now apply S_Vis_Plus_L | auto].
+      + rename Q' into Qo.
+        destruct IHStepOp as [Qs [StepSem R]].
+        exists Qs.
+        split; [now apply S_Vis_Plus_R | auto].
+      + rename P' into Po.
+        destruct IHStepOp as [Ps [StepSem R]].
+        exists (Ps ∥ Q).
+        split.
+        * Print S_Vis_Sched2_L.
+          admit.
+        * admit.
+      + admit.
+      + admit.
+      + admit.
+
     - (* The operational side can simulate the denotational semantics *)
       intros a P' STEPSEM.
       exists P'; split; [| auto].
      admit.
-
-    
-
   Admitted.
 
 End EquivSem.
