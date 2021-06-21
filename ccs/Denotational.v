@@ -246,7 +246,7 @@ Section Semantics.
    *  encoded here as None *)
   Inductive step : ccs -> option action -> ccs -> Prop :=
   (* Tau *)
-  | S_Tau_add : forall a P Q, step P a Q -> step (Tau P) a Q
+  | S_Tau : forall a P Q, step P a Q -> step (Tau P) a Q
   (* Simple action *)
   | S_Vis_Act : forall a P, step (act a ;; P) (Some a) P
   (* Synchronisation *)
@@ -383,8 +383,7 @@ Section Semantics.
   Proof.
     pcofix CIH.
     intros P Q R HPQ HQR.
-    apply CIH with (P := P) in HQR as HPR.
-    2: apply HPQ.
+    apply CIH with (P := P) in HQR as HPR; [| apply HPQ].
     pfold.
     econstructor.
     split.
@@ -428,20 +427,19 @@ Section Semantics.
       ( apply bisim_refl || now constructor).
   Qed. *)
 
-Lemma step_tau_inv : 
-forall P a Q, step (Tau P) a Q -> step P a Q.
-Proof.  
-  intros.
-  inversion H; subst; auto.
-
-  apply eqit_inv in H1. empt
-  all: admit.
-Admitted.
+  Lemma step_tau_inv :
+    forall P a Q, step (Tau P) a Q -> step P a Q.
+  Proof.
+    intros.
+    inversion H; subst; auto.
+    (* apply eqit_inv in H1. *)
+    all: admit.
+  Admitted.
 
   Lemma example1': bisim' (act (↓ "a") ;; done)
                           (Tau (act (↓ "a");; done)).
   Proof.
-    pfold. 
+    pfold.
     constructor.
     split.
     - intros.
@@ -463,6 +461,10 @@ Section EquivSem.
 
   Notation step_ccs := Denotational.step.
   Notation step_op  := Operational.step.
+
+  Notation ccsE   := (NonDetE +' ActionE +' SynchE +' DeadE).
+  Notation ccsT T := (itree ccsE T).
+  Notation ccs    := (ccsT unit).
 
   (* Lifting the operational stepping over itrees to the syntax
   via representation *)
@@ -505,17 +507,40 @@ Section EquivSem.
     inversion H.
   Qed.
 
-  Lemma bisim_para : forall P Q R, 
-   bisim P Q ->
-   bisim (P ∥ R) (Q ∥ R).
+  Definition headify a :=
+    match a with
+    | Some a => HAct a
+    | None => HSynch
+    end.
+
+  (* replaced \approx with \cong *)
+  Inductive Returns {E} {A: Type} (a: A) : itree E A -> Prop :=
+  | ReturnsRet: forall t, t ≅ Ret a -> Returns a t
+  | ReturnsTau: forall t u, t ≅ Tau u -> Returns a u -> Returns a t
+  | ReturnsVis: forall {X} (e: E X) (x: X) t k, t ≅ Vis e k -> Returns a (k x) -> Returns a t.
+
+  Theorem get_hd_means_step : forall P a P',
+      Returns (headify a P') (get_hd P)
+      <->
+      step_ccs P a P'.
   Proof.
-    pcofix CIH.
-    intros.
-    pfold.
-    econstructor.
     split; intros.
-    - inversion PStep; subst.
-      + punfold H0.
+    - (* Returns -> step *)
+      remember (headify a P').
+      remember (get_hd P).
+      revert P Heqi.
+      induction H.
+      + admit.
+      + intros.
+        subst.
+        admit.
+      + intros.
+        subst.
+        admit.
+    - (* Step -> Returns *)
+      induction H.
+      + admit.
+      + admit.
   Abort.
 
   Theorem model_correct_complete :
