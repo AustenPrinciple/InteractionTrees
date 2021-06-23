@@ -489,6 +489,11 @@ Section EquivSem.
     | None => HSynch
     end.
 
+  Inductive Returns_legacy {E} {A: Type} (a: A) : itree E A -> Prop :=
+  | Returns_legacyRet: forall t, t ≅ Ret a -> Returns_legacy a t
+  | Returns_legacyTau: forall t u, t ≅ Tau u -> Returns_legacy a u -> Returns_legacy a t
+  | Returns_legacyVis: forall {X} (e: E X) (x: X) t k, t ≅ Vis e k -> Returns_legacy a (k x) -> Returns_legacy a t.
+
   (* replaced \approx with \cong *)
   Inductive Returns {A: Type} (a: A) : ccsT A -> Prop :=
   | ReturnsRet: forall t, t ≅ Ret a -> Returns a t
@@ -752,7 +757,7 @@ Section EquivSem.
   Qed.  
 
   Theorem get_hd_means_step : forall P a P',
-      Returns (headify a P') (get_hd P)
+      Returns_legacy (headify a P') (get_hd P)
       <->
       step_ccs P a P'.
   Proof.
@@ -801,7 +806,7 @@ Section EquivSem.
             destruct a0; cbn in *; inv_eqitree EQ. 
             destruct s; cbn in *; inv_eqitree EQ. 
             destruct s; cbn in *; inv_eqitree EQ. }
-        eapply S_Tau; [apply IHReturns |].
+        eapply S_Tau; [apply IHReturns_legacy |].
         admit.
         admit.
       + intros; subst.
