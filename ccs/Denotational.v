@@ -171,59 +171,6 @@ Section Semantics.
     fun c P =>
       interp (case_ h_trigger (case_ (h_restrict c) h_trigger)) P.
 
-  Definition restrict' : chan -> ccs -> ccs.
-    refine (cofix F c P :=
-              match observe P with
-              | RetF _ => done
-              | TauF P => Tau (F c P)
-              | @VisF _ _ _ T e k =>
-                match e with
-                | schedP e => _
-                | actP e => let '(Act a) := e in
-                           match a with
-                           | Send c' | Rcv c' => if c =? c' then
-                                                  dead
-                                                else
-                                                  vis e k
-                           end
-                | synchP e => vis e (fun x => F c (k x))
-                | deadP e => P
-                end
-              end).
-    refine (match e in NonDetE X return (T = X -> ccs) with
-            | Plus => fun (b : T = bool) =>
-                       let P : ccs := _ (* F c (k true) *) in
-                       let Q : ccs := _ (* F c (k false) *) in
-                       match (observe P, observe Q) with
-                       | (VisF (deadP _) _, VisF (deadP _) _) => dead
-                       | (VisF (deadP _) _, _) => Q
-                       | (_, VisF (deadP _) _) => P
-                       | (_, _) => branch2 P Q
-                       end
-            | Sched2 => fun (b : T = bool) =>
-                         let P : ccs := _ (* F c (k true) *) in
-                         let Q : ccs := _ (* F c (k false) *) in
-                         match (observe P, observe Q) with
-                         | (VisF (deadP _) _, VisF (deadP _) _) => dead
-                         | (VisF (deadP _) _, _) => Q
-                         | (_, VisF (deadP _) _) => P
-                         | (_, _) => branch2 P Q
-                         end
-            | Sched3 => fun (b : T = choice) =>
-                         let P : ccs := _ (* F c (k Left) *) in
-                         let Q : ccs := _ (* F c (k Right) *) in
-                         let R : ccs := _ (* F c (k Synchronize) *) in
-                         match (observe P, observe Q, observe R) with
-                         | (VisF (deadP _) _, VisF (deadP _) _, VisF (deadP _) _) => dead
-                         (* this means there has been an internal communication on a restricted channel *)
-                         | (VisF (deadP _) _, VisF (deadP _) _, _) => R
-                         | (_, _, _) => branch3 P Q R
-                         end
-            end eq_refl).
-    Guarded.
-    (* TODO : finish this *)
-    Abort.
-
   Fixpoint model (t : term) : ccs :=
     match t with
     | DoneT         => done
@@ -246,28 +193,31 @@ Section Semantics.
    *  encoded here as None *)
   Inductive step : ccs -> option action -> ccs -> Prop :=
   (* Tau *)
-  | S_Tau : forall a P Q, step P a Q -> step (Tau P) a Q
+  | S_Tau : forall t a P Q,
+      t ≅ Tau P -> step P a Q -> step t a Q
   (* Simple action *)
-  | S_Vis_Act : forall a P, step (act a ;; P) (Some a) P
+  | S_Vis_Act : forall t a P,
+      t ≅ act a ;; P -> step t (Some a) P
   (* Synchronisation *)
-  | S_Vis_Synch : forall P, step (trigger Synch ;; P) None P
+  | S_Vis_Synch : forall t P,
+      t ≅ trigger Synch ;; P -> step t None P
   (* Choice *)
-  | S_Vis_Plus_L : forall a L L' R,
-      step L a L' -> step (plus L R) a L'
-  | S_Vis_Plus_R : forall a L R R',
-      step R a R' -> step (plus L R) a R'
+  | S_Vis_Plus_L : forall t a L L' R,
+      t ≅ plus L R -> step L a L' -> step t a L'
+  | S_Vis_Plus_R : forall t a L R R',
+      t ≅ plus L R -> step R a R' -> step t a R'
   (* Two-way parallelism *)
-  | S_Vis_Sched2_L : forall a L L' R,
-      step L a L' -> step (branch2 L R) a (branch2 L' R)
-  | S_Vis_Sched2_R : forall a L R R',
-      step R a R' -> step (branch2 L R) a (branch2 L R')
+  | S_Vis_Sched2_L : forall t a L L' R,
+      t ≅ branch2 L R -> step L a L' -> step t a (branch2 L' R)
+  | S_Vis_Sched2_R : forall t a L R R',
+      t ≅ branch2 L R -> step R a R' -> step t a (branch2 L R')
   (* Three-way parallelism *)
-  | S_Vis_Sched3_L : forall a L L' R S,
-      step L a L' -> step (branch3 L R S) a (branch3 L' R S)
-  | S_Vis_Sched3_R : forall a L R R' S,
-      step R a R' -> step (branch3 L R S) a (branch3 L R' S)
-  | S_Vis_Sched3_S : forall a L R S S',
-      step S a S' -> step (branch3 L R S) a (branch3 L R S').
+  | S_Vis_Sched3_L : forall t a L L' R S,
+      t ≅ branch3 L R S -> step L a L' -> step t a (branch3 L' R S)
+  | S_Vis_Sched3_R : forall t a L R R' S,
+      t ≅ branch3 L R S -> step R a R' -> step t a (branch3 L R' S)
+  | S_Vis_Sched3_S : forall t a L R S S',
+      t ≅ branch3 L R S -> step S a S' -> step t a (branch3 L R S').
 
   CoInductive bisim_old : ccs -> ccs -> Prop :=
     BiSim : forall P Q,
@@ -410,22 +360,19 @@ Section Semantics.
       exists P'.
       eauto.
   Qed.
-(* 
+
   Lemma example1: bisim_old (act (↓ "a") ;; done)
                             (Tau (act (↓ "a");; done)).
   Proof.
     constructor.
-    split.
-    - intros.
-      exists P'.
+    split; intros.
+    - exists P'.
       split.
-
-    split;
-      intros a X' XStep;
-      exists X';
-      split;
-      ( apply bisim_refl || now constructor).
-  Qed. *)
+      + now apply S_Tau with (P := (act (↓ "a");; done)).
+      + apply bisim_refl.
+    - exists Q'.
+      admit.
+  Abort.
 
   Lemma step_tau_inv :
     forall P a Q, step (Tau P) a Q -> step P a Q.
@@ -445,14 +392,14 @@ Section Semantics.
     - intros.
       exists P'.
       split; [| left; apply bisim_refl'].
-      constructor; auto.
+      now apply S_Tau with (P := (act (↓ "a");; done)).
     - intros.
       exists Q'.
       split; [| left; apply bisim_refl'].
       apply step_tau_inv; auto.
   Qed.
-  
-  End Semantics.
+
+End Semantics.
 
 From CCS Require Import
   Operational.
@@ -514,11 +461,85 @@ Section EquivSem.
     end.
 
   (* replaced \approx with \cong *)
-  Inductive Returns {E} {A: Type} (a: A) : itree E A -> Prop :=
+  Inductive Returns {A: Type} (a: A) : ccsT A -> Prop :=
   | ReturnsRet: forall t, t ≅ Ret a -> Returns a t
   | ReturnsTau: forall t u, t ≅ Tau u -> Returns a u -> Returns a t
-  | ReturnsVis: forall {X} (e: E X) (x: X) t k, t ≅ Vis e k -> Returns a (k x) -> Returns a t.
+  | ReturnsChoiceL: forall (t P Q: ccsT A),
+      t ≅ Vis (inl1 Plus) (fun b: bool => if b then P else Q) ->
+      Returns a P -> Returns a t
+  | ReturnsChoiceR: forall t P Q,
+      t ≅ Vis (inl1 Plus) (fun b: bool => if b then P else Q) ->
+      Returns a Q -> Returns a t
+  | ReturnsPara2L: forall t P Q,
+      t ≅ Vis (inl1 Sched2) (fun b: bool => if b then P else Q) ->
+      Returns a P -> Returns a t
+  | ReturnsPara2R: forall t P Q,
+      t ≅ Vis (inl1 Sched2) (fun b: bool => if b then P else Q) ->
+      Returns a Q -> Returns a t
+  | ReturnsPara3L: forall t P Q R,
+      t ≅ Vis (inl1 Sched3) (fun c => match c with
+                                   | Left => P
+                                   | Right => Q
+                                   | Synchronize => R
+                                   end) ->
+      Returns a P -> Returns a t
+  | ReturnsPara3R: forall t P Q R,
+      t ≅ Vis (inl1 Sched3) (fun c => match c with
+                                   | Left => P
+                                   | Right => Q
+                                   | Synchronize => R
+                                   end) ->
+      Returns a Q -> Returns a t
+  | ReturnsPara3S: forall t P Q R,
+      t ≅ Vis (inl1 Sched3) (fun c => match c with
+                                   | Left => P
+                                   | Right => Q
+                                   | Synchronize => R
+                                   end) ->
+      Returns a R -> Returns a t.
 
+  Inductive Finite {E X} : itree E X -> Prop :=
+  | FRet : forall x, Finite (Ret x)
+  | FTau : forall P, Finite P -> Finite (Tau P)
+  | FVis : forall {A} (e: E A) x k, Finite (k x) -> Finite (Vis e k).
+
+  Theorem finite_head : forall P, Finite P -> Finite (get_hd P).
+  Proof.
+    intros.
+    induction H.
+    all: admit.
+  Abort.
+
+  Theorem finite_model : forall P, Finite (model P).
+  Proof.
+    induction P.
+    - constructor.
+    - admit.
+    all: admit.
+  Abort.
+
+  Theorem machin : forall P, exists a k, Returns (headify a k) (get_hd (model P)).
+  Proof.
+    induction P.
+    - simpl.
+      Print headify.
+      Check Returns.
+  Abort.
+
+    (* écrire :
+      prédicat finite
+      pour tout P, finite model P
+      finite P -> finite (get_hd P)
+
+     écrire (et prouver)
+      pour tout P, exists a k, Returns++ (a,k) (get_hd (model P))
+
+     réfléchir à comment écrire
+      ????
+      Returns++ (a,k) P -> step (c a) b Q -> step (P ;; c) b q
+      "si la deuxième moitié du para passe (wrt. step), la première devrait passer aussi parce que les get_hds sont finis"
+      ????
+   *)
   Theorem get_hd_means_step : forall P a P',
       Returns (headify a P') (get_hd P)
       <->
@@ -526,22 +547,15 @@ Section EquivSem.
   Proof.
     split; intros.
     - (* Returns -> step *)
-      remember (headify a P').
-      remember (get_hd P).
-      revert P Heqi.
-      induction H.
-      + admit.
-      + intros.
-        subst.
-        admit.
-      + intros.
-        subst.
-        admit.
+      remember (headify a P') as aP'.
+      remember (get_hd P) as hd_P.
+      revert P Heqhd_P.
+      induction H; admit.
     - (* Step -> Returns *)
       induction H.
       + admit.
       + admit.
-  Abort.
+  Admitted.
 
   Theorem model_correct_complete :
     forall P, bisim P P.
@@ -552,18 +566,19 @@ Section EquivSem.
     econstructor.
     split.
     - (* The denotational side can simulate the operational semantics *)
-      intros a Po StepOp.
-      exists Po.
+      intros a P' StepOp.
+      exists P'.
       split; [| right; auto].
       clear CIH r.
       induction StepOp; try now constructor.
       + clear StepOp.
-        unfold step_sem. 
+        red.
         cbn.
         red in IHStepOp.
-  admit.        
-        (* 
-           step_ccs (model P) !b ∅ 
+        admit.
+      + admit.
+        (*
+           step_ccs (model P) !b ∅
 
            get_hd (choice2 (true -> !a ; false -> !b))
 
@@ -575,7 +590,7 @@ Section EquivSem.
 
            step_ccs (model P) explore un chemin prefix de choices de (model P)
            step_ccs (para (model P) (model Q))
-              explore le même chemin prefix de choices, 
+              explore le même chemin prefix de choices,
               mais dans l'arbre prefix get_hd (model P)
 
             )
@@ -586,9 +601,12 @@ Section EquivSem.
 
 
         *)
+      + admit.
+      + admit.
+      + admit.
+      + admit.
 
-
-(* 
+(*
       rename P' into Po.
         destruct IHStepOp as [Ps [StepSem R]].
         exists (Ps ∥ Q).
@@ -596,12 +614,9 @@ Section EquivSem.
         * Print S_Vis_Sched2_L.
           admit.
         * admit. *)
-      + admit. 
-      + admit.
-      + admit.
 
     - (* The operational side can simulate the denotational semantics *)
-      intros a P' STEPSEM.
+      intros a P' StepSem.
       exists P'; split; [| auto].
      admit.
   Admitted.
