@@ -537,13 +537,6 @@ Section EquivSem.
   | FTau : forall P, Finite P -> Finite (Tau P)
   | FVis : forall {A} (e: E A) x k, Finite (k x) -> Finite (Vis e k).
 
-  Theorem finite_head : forall P, Finite P -> Finite (get_hd P).
-  Proof.
-    intros.
-    induction H.
-    all: admit.
-  Abort.
-
   Theorem finite_model : forall P, Finite (model P).
   Proof.
     induction P.
@@ -693,11 +686,29 @@ Section EquivSem.
   .
 
   Lemma get_hd_unfold : forall P, 
-  get_hd P ≅ get_hd_ P.
+    get_hd P ≅ get_hd_ P.
   Proof.
     intros.
     apply observing_sub_eqit; constructor; reflexivity.
   Qed.
+
+  Global Instance Finite_eq_itree {E X} :
+    Proper (eq_itree eq ==> flip impl) (@Finite E X).
+    Proof.
+      do 4 red; intros * EQ FIN.
+      induction FIN.
+      apply eqitree_inv_Ret_r in EQ. destruct EQ as (? & -> & EQ).
+    Admitted.      
+
+  Theorem finite_head : forall P, Finite P -> Finite (get_hd P).
+  Proof.
+    intros.
+    induction H.
+    - pose proof (get_hd_unfold (Ret x)). cbn in H.
+      rewrite H.
+
+    all: admit.
+  Abort.
 
   Definition eq_head : head -> head -> Prop :=
   fun h1 h2 =>
@@ -771,7 +782,7 @@ Section EquivSem.
       induction H.
       + (* [get_hd P] is a [Ret x], we derive information on the shape of P *)
         intros; subst.
-        pose proof (itree_eta P) as EQ; rewrite EQ; apply get_hd_eq_itree in EQ.
+        pose proof (itree_eta P) as EQ. rewrite EQ. apply get_hd_eq_itree in EQ.
         rewrite H in EQ; clear H.
         destruct (observe P).
         * (* Can't be a Ret *)
@@ -799,21 +810,19 @@ Section EquivSem.
       + (* [get_hd] starts with a [Tau] *)
         intros; subst.
         pose proof (itree_eta P) as EQ; rewrite EQ; apply get_hd_eq_itree in EQ.
-        rewrite H in EQ; clear H.
+        rewrite H in EQ.
         destruct (observe P); rewrite get_hd_unfold in EQ; cbn in EQ; inv_eqitree EQ.
         2:{ destruct e; cbn in *; inv_eqitree EQ. 
             destruct s; cbn in *; inv_eqitree EQ. 
             destruct a0; cbn in *; inv_eqitree EQ. 
             destruct s; cbn in *; inv_eqitree EQ. 
             destruct s; cbn in *; inv_eqitree EQ. }
-        eapply S_Tau; [apply IHReturns_legacy |].
+        (* apply S_Tau with u. [apply IHReturns_legacy |]. *)
         admit.
-        admit.
+
       + intros; subst.
         pose proof (itree_eta P) as EQ; rewrite EQ; apply get_hd_eq_itree in EQ.
         rewrite H in EQ; clear H.
-        destruct (observe P); rewrite get_hd_unfold in EQ; cbn in EQ; inv_eqitree EQ.
-        destruct e0; cbn in *; inv_eqitree EQ. 
         2:{ destruct s; cbn in *; inv_eqitree EQ. 
             destruct a0; cbn in *; inv_eqitree EQ. 
             destruct s; cbn in *; inv_eqitree EQ. 
@@ -824,6 +833,12 @@ Section EquivSem.
       + admit.
       + admit.
   Admitted.
+
+(* para P Q ~~ get_hd P;; get_hd Q;; fait la comm
+  step_ccs t a t' -> step_ccs (get_hd P;;
+
+*)
+
 
   Theorem machin : forall P, exists a k, Returns (headify a k) (get_hd (model P)).
   Proof.
