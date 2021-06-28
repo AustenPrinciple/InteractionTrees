@@ -670,26 +670,10 @@ Section EquivSem.
     get_hd P ≅ get_hd_ P.
   Proof.
     intros.
-    apply observing_sub_eqit; constructor; reflexivity.
+    apply observing_sub_eqit.
+    constructor.
+    reflexivity.
   Qed.
-
-  Global Instance Finite_eq_itree {E X} :
-    Proper (eq_itree eq ==> flip impl) (@Finite E X).
-    Proof.
-      do 4 red; intros * EQ FIN.
-      induction FIN.
-      apply eqitree_inv_Ret_r in EQ. destruct EQ as (? & -> & EQ).
-    Admitted.
-
-  Theorem finite_head : forall P, Finite P -> Finite (get_hd P).
-  Proof.
-    intros.
-    induction H.
-    - pose proof (get_hd_unfold (Ret x)). cbn in H.
-      rewrite H.
-
-    all: admit.
-  Abort.
 
   Definition eq_head : head -> head -> Prop :=
   fun h1 h2 =>
@@ -754,21 +738,44 @@ Section EquivSem.
   | FVis : forall {A} (e: E A) k t,
       t ≅ Vis e k -> (forall x, Finite (k x)) -> Finite (Vis e k).
 
+  Global Instance Finite_eq_itree {E X} :
+    Proper (eq_itree eq ==> flip impl) (@Finite E X).
+  Proof.
+    do 4 red.
+    intros x y Cong Fin.
+    induction Fin.
+    - apply eqitree_inv_Ret_r in H.
+      destruct H as (? & -> & Eq).
+      rewrite <- Cong in Eq.
+      admit.
+    - apply eqitree_inv_Tau_r in H.
+      destruct H as [t' [Obs Cong']].
+      admit.
+    -
+      (* TODO *)
+  Admitted.
+
   Theorem finite_head : forall P, Finite P -> Finite (get_hd P).
   Proof.
     intros.
     induction H.
-    - rewrite get_hd_unfold.
+    - pose proof (get_hd_unfold (Ret x)).
+      cbn in H0.
+      rewrite <- H in H0.
+    all: admit.
   Abort.
 
   Theorem finite_model : forall P, Finite (model P).
   Proof.
     induction P.
-    - constructor.
-    - admit.
+    - cbn.
+      unfold done.
+      apply FRet with tt.
+      reflexivity.
+    - cbn.
+      Print FVis.
     all: admit.
   Abort.
-
 
   Theorem get_hd_means_step : forall P a P',
       Returns_legacy (headify a P') (get_hd P)
@@ -776,61 +783,74 @@ Section EquivSem.
       step_ccs P a P'.
   Proof.
     split; intros.
-    - (* Returns -> step : if a finite path exists in the [get_hd] tree, it
-         can be used as a proof tree to justify a [step_ccs] *)
-      remember (headify a P').
-      remember (get_hd P).
-      revert P Heqi.
+    - (* Returns -> step :
+       * if a finite path exists in the [get_hd] tree, it
+       * can be used as a proof tree to justify a [step_ccs] *)
+      remember (headify a P') as aP'.
+      remember (get_hd P) as head_P.
+      revert P Heqhead_P.
       (* By induction on the path in the tree *)
       induction H.
       + (* [get_hd P] is a [Ret x], we derive information on the shape of P *)
         intros; subst.
-        pose proof (itree_eta P) as EQ. rewrite EQ. apply get_hd_eq_itree in EQ.
+        pose proof (itree_eta P) as EQ.
+        rewrite EQ.
+        apply get_hd_eq_itree in EQ.
         rewrite H in EQ; clear H.
         destruct (observe P).
         * (* Can't be a Ret *)
-          rewrite get_hd_unfold in EQ; cbn in EQ. 
-          inv_eqitree EQ; destruct a; cbn in EQ; contradiction.
-        * (* Can't be a Tau *)
-          rewrite get_hd_unfold in EQ; cbn in EQ. 
+          rewrite get_hd_unfold in EQ; cbn in EQ.
           inv_eqitree EQ.
-        * rewrite get_hd_unfold in EQ; cbn in EQ. 
+          destruct a; cbn in EQ; contradiction.
+        * (* Can't be a Tau *)
+          rewrite get_hd_unfold in EQ; cbn in EQ.
+          inv_eqitree EQ.
+        * rewrite get_hd_unfold in EQ; cbn in EQ.
           destruct e; cbn; inv_eqitree EQ.
           destruct s; cbn.
           destruct a0; cbn; inv_eqitree EQ.
           destruct a; cbn in EQ; try contradiction.
           destruct EQ as [<- EQ].
           constructor.
-          unfold act; rewrite bind_trigger; apply eqit_Vis; intros []. 
+          unfold act; rewrite bind_trigger; apply eqit_Vis; intros [].
           symmetry; auto.
           destruct s; cbn; inv_eqitree EQ.
           destruct s; cbn; inv_eqitree EQ.
           destruct a; cbn in EQ; try contradiction.
           constructor.
-          rewrite bind_trigger; apply eqit_Vis; intros []. 
+          rewrite bind_trigger; apply eqit_Vis; intros [].
           symmetry; auto.
-          destruct a; cbn in EQ; try contradiction.
+          destruct a; cbn in EQ; contradiction.
       + (* [get_hd] starts with a [Tau] *)
         intros; subst.
-        pose proof (itree_eta P) as EQ; rewrite EQ; apply get_hd_eq_itree in EQ.
-        rewrite H in EQ.
-        destruct (observe P); rewrite get_hd_unfold in EQ; cbn in EQ; inv_eqitree EQ.
-        2:{ destruct e; cbn in *; inv_eqitree EQ. 
-            destruct s; cbn in *; inv_eqitree EQ. 
-            destruct a0; cbn in *; inv_eqitree EQ. 
-            destruct s; cbn in *; inv_eqitree EQ. 
-            destruct s; cbn in *; inv_eqitree EQ. }
-        (* apply S_Tau with u. [apply IHReturns_legacy |]. *)
+        pose proof (itree_eta P) as EQ.
+        rewrite EQ.
+        apply get_hd_eq_itree in EQ.
+        rewrite H in EQ; clear H.
+        destruct (observe P);
+          rewrite get_hd_unfold in EQ;
+          cbn in EQ;
+          inv_eqitree EQ.
+        * admit.
+        * destruct e; cbn in *; inv_eqitree EQ.
+          destruct s; cbn in *; inv_eqitree EQ.
+          destruct a0; cbn in *; inv_eqitree EQ.
+          destruct s; cbn in *; inv_eqitree EQ.
+          destruct s; cbn in *; inv_eqitree EQ.
+      (*
+        eapply S_Tau; [apply IHReturns_legacy |].
         admit.
-
+        admit. *)
       + intros; subst.
         pose proof (itree_eta P) as EQ; rewrite EQ; apply get_hd_eq_itree in EQ.
         rewrite H in EQ; clear H.
-        2:{ destruct s; cbn in *; inv_eqitree EQ. 
-            destruct a0; cbn in *; inv_eqitree EQ. 
-            destruct s; cbn in *; inv_eqitree EQ. 
-            destruct s; cbn in *; inv_eqitree EQ. }
-        admit.
+        destruct (observe P); rewrite get_hd_unfold in EQ; cbn in EQ; inv_eqitree EQ.
+        destruct e0; cbn in *; inv_eqitree EQ.
+        * admit.
+        * destruct s; cbn in *; inv_eqitree EQ.
+          destruct a0; cbn in *; inv_eqitree EQ.
+          destruct s; cbn in *; inv_eqitree EQ.
+          destruct s; cbn in *; inv_eqitree EQ.
    - (* Step -> Returns *)
       induction H.
       + admit.
