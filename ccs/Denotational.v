@@ -734,36 +734,53 @@ Section EquivSem.
 
   Inductive Finite {E X} : itree E X -> Prop :=
   | FRet : forall x t, t ≅ Ret x -> Finite t
-  | FTau : forall P t, Finite P -> t ≅ Tau P -> Finite t
+  | FTau : forall P t, t ≅ Tau P -> Finite P -> Finite t
   | FVis : forall {A} (e: E A) k t,
-      t ≅ Vis e k -> (forall x, Finite (k x)) -> Finite (Vis e k).
+      t ≅ Vis e k -> (forall x, Finite (k x)) -> Finite t.
 
+  Inductive FiniteSchedTree {X} : itree ccsE X -> Prop :=
+  | FSTRet : forall x t, t ≅ Ret x -> FiniteSchedTree t
+  | FSTTau : forall P t, t ≅ Tau P -> FiniteSchedTree P -> FiniteSchedTree t
+  | FSTSched2 : forall (t : itree ccsE X) (k : bool -> itree ccsE X),
+      t ≅ (b <- trigger Sched2;; k b) ->
+      (forall b, FiniteSchedTree (k b)) ->
+      FiniteSchedTree t
+  | FSTSched3 : forall (t : itree ccsE X) (k : _ -> itree ccsE X),
+      t ≅ (c <- trigger Sched3;; k c) ->
+      (forall c, FiniteSchedTree (k c)) ->
+      FiniteSchedTree t
+  | FSTPlus : forall (t : itree ccsE X) (k : _ -> itree ccsE X),
+      t ≅ (b <- trigger Plus;; k b) ->
+      (forall b, FiniteSchedTree (k b)) ->
+      FiniteSchedTree t.
+     
   Global Instance Finite_eq_itree {E X} :
     Proper (eq_itree eq ==> flip impl) (@Finite E X).
   Proof.
     do 4 red.
     intros x y Cong Fin.
-    induction Fin.
-    - apply eqitree_inv_Ret_r in H.
-      destruct H as (? & -> & Eq).
-      rewrite <- Cong in Eq.
-      admit.
+    revert x Cong.
+    induction Fin; intros ?x Cong.
+    - apply FRet with x.
+      rewrite Cong; auto.
     - apply eqitree_inv_Tau_r in H.
       destruct H as [t' [Obs Cong']].
-      admit.
-    -
-      (* TODO *)
+      eapply FTau. 2:eapply IHFin; eauto.
+      rewrite Cong. rewrite (itree_eta t). rewrite Obs. reflexivity.
+    - apply eqitree_inv_Vis_r in H.
+      destruct H as [t' [Obs Cong']].
+      eapply FVis.
+      admit. 
   Admitted.
 
-  Theorem finite_head : forall P, Finite P -> Finite (get_hd P).
+  Theorem finite_head : forall P, Finite P -> FiniteSchedTree (get_hd P).
   Proof.
     intros.
     induction H.
     - pose proof (get_hd_unfold (Ret x)).
       cbn in H0.
-      rewrite <- H in H0.
     all: admit.
-  Abort.
+  Admitted.
 
   Theorem finite_model : forall P, Finite (model P).
   Proof.
@@ -775,9 +792,34 @@ Section EquivSem.
     - cbn.
       Print FVis.
     all: admit.
-  Abort.
+  Admitted.
 
-  Theorem get_hd_means_step : forall P a P',
+  Lemma get_hd_FST : forall P, FiniteSchedTree (get_hd (model P)).
+  Proof.
+    intros; eapply finite_head, finite_model.
+  Qed.
+
+(* para (model P) (model Q) ~~
+   x <- get_hd P;
+   y <- get_hd Q;
+   Sched de la bonne action
+
+*)
+
+  Lemma FST_prefix_can_step : forall {X} (t : itree ccsE X) (k : X -> ccs) x a t',
+    FiniteSchedTree t ->
+    step_ccs (k x) a t' ->
+    step_ccs (x <- t;; k x) a t'.
+  Admitted.
+
+  Theorem step_ccs_get_hd_returns : forall P a P',
+      step_ccs P a P'
+      ->
+      Returns_legacy (headify a P') (get_hd P).
+  Proof.
+ Admitted.
+
+  Theorem get_hd_means_step_deprecated : forall P a P',
       Returns_legacy (headify a P') (get_hd P)
       <->
       step_ccs P a P'.
@@ -862,7 +904,6 @@ Section EquivSem.
 
 *)
 
-
   Theorem machin : forall P, exists a k, Returns (headify a k) (get_hd (model P)).
   Proof.
     induction P.
@@ -906,7 +947,18 @@ Section EquivSem.
         red in IHStepOp.
         admit.
       + admit.
+      + clear StepOp.
+        red; red in IHStepOp.
+        cbn.
+        admit.
         (*
+
+          (ax,kP) <- get_hd P;
+          (ay,kQ) <- get_hd Q;
+          b <- Sched2;
+           true -> trigger ax;; para (kP tt) Q 
+           false -> trigger ay;; para P (kQ tt)
+
            step_ccs (model P) !b ∅
 
            get_hd (choice2 (true -> !a ; false -> !b))
