@@ -768,18 +768,54 @@ Section EquivSem.
     do 4 red.
     intros x y Cong Fin.
     revert x Cong.
-    induction Fin; intros ?x Cong.
+    induction Fin;
+      intros.
     - apply FRet with x.
-      rewrite Cong; auto.
+      now rewrite Cong.
     - apply eqitree_inv_Tau_r in H.
       destruct H as [t' [Obs Cong']].
-      eapply FTau. 2:eapply IHFin; eauto.
-      rewrite Cong. rewrite (itree_eta t). rewrite Obs. reflexivity.
+      apply FTau with P.
+      + rewrite Cong.
+        rewrite itree_eta, Obs.
+        now rewrite Cong'.
+      + now apply IHFin.
     - apply eqitree_inv_Vis_r in H.
       destruct H as [t' [Obs Cong']].
       eapply FVis.
-      admit.
-  Admitted.
+      + rewrite Cong.
+        now rewrite itree_eta, Obs.
+      + intro.
+        apply H1 with x0.
+        apply Cong'.
+  Qed.
+
+  Global Instance FST_eq_itree {X} :
+    Proper (eq_itree eq ==> flip impl) (@FiniteSchedTree X).
+  Proof.
+    do 4 red.
+    intros x y Cong Fin.
+    revert x Cong.
+    induction Fin;
+      intros.
+    - apply FSTRet with x.
+      now rewrite Cong.
+    - apply eqitree_inv_Tau_r in H.
+      destruct H as [t' [Obs Cong']].
+      apply FSTTau with P.
+      + rewrite Cong.
+        rewrite itree_eta, Obs.
+        now rewrite Cong'.
+      + now apply IHFin.
+    - apply FSTPlus with k.
+      rewrite Cong.
+      all: assumption.
+    - apply FSTSched2 with k.
+      rewrite Cong.
+      all: assumption.
+    - apply FSTSched3 with k.
+      rewrite Cong.
+      all: assumption.
+  Qed.
 
   Theorem finite_head : forall P, Finite P -> FiniteSchedTree (get_hd P).
   Proof.
@@ -991,7 +1027,6 @@ Section EquivSem.
 
 
         *)
-      + admit.
       + admit.
       + admit.
       + admit.
