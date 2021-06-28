@@ -535,7 +535,12 @@ Section EquivSem.
     Lemma eqitree_inv_Tau_r (t : itree E R1) t' :
       eq_itree RR t (Tau t') -> exists t0, observe t = TauF t0 /\ eq_itree RR t0 t'.
     Proof.
-      intros; punfold H; inv H; try inv CHECK; pclearbot; eauto.
+      intros.
+      punfold H.
+      inv H;
+        try inv CHECK;
+        pclearbot;
+        eauto.
     Qed.
 
     Lemma eqitree_inv_Tau_l (t : itree E R1) t' :
@@ -579,9 +584,12 @@ Section EquivSem.
     Lemma eqitree_inv_Vis_r {U} (t : itree E R1) (e : E U) (k : U -> itree E R2) :
       eq_itree RR t (Vis e k) -> exists k', observe t = VisF e k' /\ forall u, eq_itree RR (k' u) (k u).
     Proof.
-      intros; punfold H; apply eqitF_inv_VisF_r in H.
+      intros.
+      punfold H.
+      apply eqitF_inv_VisF_r in H.
       destruct H as [ [? [-> ?]] | [] ]; [ | discriminate ].
-      pclearbot. eexists; split; eauto.
+      pclearbot.
+      eexists; split; eauto.
     Qed.
 
     Lemma eqitree_inv_Vis_l {U} (t : itree E R2) (e : E U) (k : U -> _) :
@@ -712,8 +720,8 @@ Section EquivSem.
     revert x EQ1 x0 EQ2.
     induction STEP; intros.
     - apply S_Tau with P.
-      2:etransitivity; eauto.
-      apply IHSTEP; [reflexivity | auto].
+      + now apply IHSTEP.
+      + etransitivity; eauto.
     - apply S_Act; rewrite EQ1,H; apply eqit_bind; [reflexivity | intros ?; symmetry; auto].
     - apply S_Synch; rewrite EQ1,H; apply eqit_bind; [reflexivity | intros ?; symmetry; auto].
     - eapply S_Plus_L; [| rewrite EQ1; eauto].
@@ -753,7 +761,7 @@ Section EquivSem.
       t ≅ (b <- trigger Plus;; k b) ->
       (forall b, FiniteSchedTree (k b)) ->
       FiniteSchedTree t.
-     
+
   Global Instance Finite_eq_itree {E X} :
     Proper (eq_itree eq ==> flip impl) (@Finite E X).
   Proof.
@@ -770,7 +778,7 @@ Section EquivSem.
     - apply eqitree_inv_Vis_r in H.
       destruct H as [t' [Obs Cong']].
       eapply FVis.
-      admit. 
+      admit.
   Admitted.
 
   Theorem finite_head : forall P, Finite P -> FiniteSchedTree (get_hd P).
@@ -904,7 +912,8 @@ Section EquivSem.
 
 *)
 
-  Theorem machin : forall P, exists a k, Returns (headify a k) (get_hd (model P)).
+
+  Theorem get_hd_always_returns : forall P, exists a k, Returns (headify a k) (get_hd (model P)).
   Proof.
     induction P.
     - simpl.
@@ -925,8 +934,8 @@ Section EquivSem.
       Returns++ (a,k) P -> step (c a) b Q -> step (P ;; c) b q
       "si la deuxième moitié du para passe (wrt. step), la première devrait passer aussi parce que les get_hds sont finis"
       ????
-   *)
- 
+     *)
+
   Theorem model_correct_complete :
     forall P, bisim P P.
   Proof.
@@ -956,7 +965,7 @@ Section EquivSem.
           (ax,kP) <- get_hd P;
           (ay,kQ) <- get_hd Q;
           b <- Sched2;
-           true -> trigger ax;; para (kP tt) Q 
+           true -> trigger ax;; para (kP tt) Q
            false -> trigger ay;; para P (kQ tt)
 
            step_ccs (model P) !b ∅
