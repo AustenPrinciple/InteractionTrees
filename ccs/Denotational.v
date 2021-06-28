@@ -749,6 +749,10 @@ Section EquivSem.
   Inductive FiniteSchedTree {X} : itree ccsE X -> Prop :=
   | FSTRet : forall x t, t ≅ Ret x -> FiniteSchedTree t
   | FSTTau : forall P t, t ≅ Tau P -> FiniteSchedTree P -> FiniteSchedTree t
+  | FSTPlus : forall (t : itree ccsE X) (k : _ -> itree ccsE X),
+      t ≅ (b <- trigger Plus;; k b) ->
+      (forall b, FiniteSchedTree (k b)) ->
+      FiniteSchedTree t
   | FSTSched2 : forall (t : itree ccsE X) (k : bool -> itree ccsE X),
       t ≅ (b <- trigger Sched2;; k b) ->
       (forall b, FiniteSchedTree (k b)) ->
@@ -756,10 +760,6 @@ Section EquivSem.
   | FSTSched3 : forall (t : itree ccsE X) (k : _ -> itree ccsE X),
       t ≅ (c <- trigger Sched3;; k c) ->
       (forall c, FiniteSchedTree (k c)) ->
-      FiniteSchedTree t
-  | FSTPlus : forall (t : itree ccsE X) (k : _ -> itree ccsE X),
-      t ≅ (b <- trigger Plus;; k b) ->
-      (forall b, FiniteSchedTree (k b)) ->
       FiniteSchedTree t.
 
   Global Instance Finite_eq_itree {E X} :
