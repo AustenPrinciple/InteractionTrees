@@ -384,6 +384,15 @@ Section Semantics.
       eauto.
   Qed.
 
+  Lemma step_tau_inv :
+    forall P a Q, step (Tau P) a Q -> step P a Q.
+  Proof.
+    intros.
+    inversion H; subst; auto.
+    (* apply eqit_inv in H1. *)
+    all: admit.
+  Admitted.
+
   Lemma example1: bisim_old (act (↓ "a") ;; done)
                             (Tau (act (↓ "a");; done)).
   Proof.
@@ -395,18 +404,9 @@ Section Semantics.
       + apply bisim_refl.
     - exists Q'.
       split.
-      + admit.
+      + now apply step_tau_inv.
       + apply bisim_refl.
-  Abort.
-
-  Lemma step_tau_inv :
-    forall P a Q, step (Tau P) a Q -> step P a Q.
-  Proof.
-    intros.
-    inversion H; subst; auto.
-    (* apply eqit_inv in H1. *)
-    all: admit.
-  Admitted.
+  Qed.
 
   Lemma example1': bisim' (act (↓ "a") ;; done)
                           (Tau (act (↓ "a");; done)).
