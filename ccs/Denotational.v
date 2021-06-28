@@ -747,18 +747,18 @@ Section EquivSem.
       t ≅ Vis e k -> (forall x, Finite (k x)) -> Finite t.
 
   Inductive FiniteSchedTree {X} : itree ccsE X -> Prop :=
-  | FSTRet : forall x t, t ≅ Ret x -> FiniteSchedTree t
-  | FSTTau : forall P t, t ≅ Tau P -> FiniteSchedTree P -> FiniteSchedTree t
-  | FSTPlus : forall (t : itree ccsE X) (k : _ -> itree ccsE X),
-      t ≅ (b <- trigger Plus;; k b) ->
+  | FSTRet : forall {A} R t (x: A), eq_itree R t (Ret x) -> FiniteSchedTree t
+  | FSTTau : forall R t P, eq_itree R t (Tau P) -> FiniteSchedTree P -> FiniteSchedTree t
+  | FSTPlus : forall R t k,
+      eq_itree R t (b <- trigger Plus;; k b) ->
       (forall b, FiniteSchedTree (k b)) ->
       FiniteSchedTree t
-  | FSTSched2 : forall (t : itree ccsE X) (k : bool -> itree ccsE X),
-      t ≅ (b <- trigger Sched2;; k b) ->
+  | FSTSched2 : forall R t k,
+      eq_itree R t (b <- trigger Sched2;; k b) ->
       (forall b, FiniteSchedTree (k b)) ->
       FiniteSchedTree t
-  | FSTSched3 : forall (t : itree ccsE X) (k : _ -> itree ccsE X),
-      t ≅ (c <- trigger Sched3;; k c) ->
+  | FSTSched3 : forall R t k,
+      eq_itree R t (c <- trigger Sched3;; k c) ->
       (forall c, FiniteSchedTree (k c)) ->
       FiniteSchedTree t.
 
@@ -774,10 +774,9 @@ Section EquivSem.
       now rewrite Cong.
     - apply eqitree_inv_Tau_r in H.
       destruct H as [t' [Obs Cong']].
-      apply FTau with P.
+      apply FTau with t'.
       + rewrite Cong.
-        rewrite itree_eta, Obs.
-        now rewrite Cong'.
+        now rewrite itree_eta, Obs.
       + now apply IHFin.
     - apply eqitree_inv_Vis_r in H.
       destruct H as [t' [Obs Cong']].
@@ -790,41 +789,88 @@ Section EquivSem.
   Qed.
 
   Global Instance FST_eq_itree {X} :
-    Proper (eq_itree eq ==> flip impl) (@FiniteSchedTree X).
+    forall R, Proper (eq_itree R ==> flip impl) (@FiniteSchedTree X).
   Proof.
     do 4 red.
-    intros x y Cong Fin.
-    revert x Cong.
+    intros R x y Cong Fin.
+    revert R x Cong.
     induction Fin;
       intros.
-    - apply FSTRet with x.
-      now rewrite Cong.
+    - apply FSTRet with R x.
+      (* now rewrite Cong. *)
+      admit.
     - apply eqitree_inv_Tau_r in H.
       destruct H as [t' [Obs Cong']].
-      apply FSTTau with P.
-      + rewrite Cong.
-        rewrite itree_eta, Obs.
-        now rewrite Cong'.
-      + now apply IHFin.
-    - apply FSTPlus with k.
-      rewrite Cong.
-      all: assumption.
-    - apply FSTSched2 with k.
-      rewrite Cong.
-      all: assumption.
-    - apply FSTSched3 with k.
-      rewrite Cong.
-      all: assumption.
-  Qed.
+      apply FSTTau with R P.
+      + (* rewrite Cong.
+           rewrite itree_eta, Obs.
+           now rewrite Cong'. *)
+        admit.
+      + apply IHFin with R0.
+        admit.
+    - apply FSTPlus with R k.
+      (* rewrite Cong.
+         all: assumption. *)
+      all: admit.
+    - apply FSTSched2 with R k.
+      (* rewrite Cong.
+         all: assumption. *)
+      all: admit.
+    - apply FSTSched3 with R k.
+      (* rewrite Cong.
+         all: assumption. *)
+      all: admit.
+  Admitted.
 
+  (* This feels like it could be simpler *)
   Theorem finite_head : forall P, Finite P -> FiniteSchedTree (get_hd P).
   Proof.
     intros.
     induction H.
-    - pose proof (get_hd_unfold (Ret x)).
-      cbn in H0.
-    all: admit.
-  Admitted.
+    - (* Ret *)
+      pose proof (get_hd_unfold (Ret x)) as Eq;
+        cbn in Eq.
+      apply FSTRet with eq_head HDone.
+      apply get_hd_eq_itree in H.
+      now rewrite Eq in H.
+    - (* Tau *)
+      pose proof (get_hd_unfold (Tau P)) as Eq;
+        cbn in Eq.
+      rewrite H, Eq.
+      now apply FSTTau with eq (get_hd P).
+    - (* Vis *)
+      rewrite H.
+      induction e.
+      + (* Vis NonDetE *)
+        pose proof (get_hd_unfold (Vis (schedP n) k)) as Eq;
+          cbn in Eq.
+        rewrite Eq.
+        induction n;
+          [ apply FSTPlus with eq (fun x => get_hd (k x))
+          | apply FSTSched2 with eq (fun x => get_hd (k x))
+          | apply FSTSched3 with eq (fun x => get_hd (k x))];
+          (now rewrite bind_trigger || assumption).
+      + induction s.
+        * (* Vis Act *)
+          induction a.
+          pose proof (get_hd_unfold (Vis (actP (Act a)) k)) as Eq;
+            cbn in Eq.
+          rewrite Eq.
+          now apply FSTRet with eq (HAct a (k tt)).
+        * induction s.
+          -- (* Vis Synch *)
+            induction s.
+            pose proof (get_hd_unfold (Vis (synchP Synch) k)) as Eq;
+              cbn in Eq.
+            rewrite Eq.
+            now apply FSTRet with eq (HSynch (k tt)).
+          -- (* Vis Dead *)
+            induction d.
+            pose proof (get_hd_unfold (Vis (deadP (Throw u)) k)) as Eq;
+              cbn in Eq.
+            rewrite Eq.
+            now apply FSTRet with eq HDone.
+  Qed.
 
   Theorem finite_model : forall P, Finite (model P).
   Proof.
