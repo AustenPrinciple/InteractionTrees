@@ -874,14 +874,27 @@ Section EquivSem.
 
   Theorem finite_model : forall P, Finite (model P).
   Proof.
-    induction P.
-    - cbn.
+    induction P;
+      cbn.
+    - (* 0 *)
       unfold done.
-      apply FRet with tt.
-      reflexivity.
-    - cbn.
-      Print FVis.
-    all: admit.
+      now apply FRet with tt.
+    - (* a ⋅ P *)
+      unfold act.
+      rewrite bind_trigger.
+      now eapply FVis.
+    - (* para *)
+      admit.
+    - (* plus *)
+      unfold plus.
+      rewrite bind_trigger.
+      eapply FVis.
+      + reflexivity.
+      + intro b.
+        case_eq b;
+          auto.
+    - (* restrict *)
+      admit.
   Admitted.
 
   Lemma get_hd_FST : forall P, FiniteSchedTree (get_hd (model P)).
