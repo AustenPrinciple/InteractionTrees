@@ -16,6 +16,7 @@ Import CCSNotations.
 Open Scope ccs_scope.
 
 From Paco Require Import paco.
+From Coq Require Import Morphisms.
 
 Section Semantics.
 
@@ -242,6 +243,33 @@ Section Semantics.
       P' ≅ branch3 L R S' ->
       step P a P'.
 
+  Global Instance eq_itree_step :
+    Proper (eq_itree eq ==> eq ==> eq_itree eq ==> flip impl) step.
+  Proof.
+    do 6 red; intros * EQ1 * -> * EQ2 STEP.
+    revert x EQ1 x0 EQ2.
+    induction STEP; intros.
+    - apply S_Tau with P.
+      + now apply IHSTEP.
+      + etransitivity; eauto.
+    - apply S_Act; rewrite EQ1,H; apply eqit_bind; [reflexivity | intros ?; symmetry; auto].
+    - apply S_Synch; rewrite EQ1,H; apply eqit_bind; [reflexivity | intros ?; symmetry; auto].
+    - eapply S_Plus_L; [| rewrite EQ1; eauto].
+      apply IHSTEP; [reflexivity | auto].
+    - eapply S_Plus_R; [| rewrite EQ1; eauto].
+      apply IHSTEP; [reflexivity | auto].
+    - eapply S_Sched2_L; [| rewrite EQ1; eauto | rewrite EQ2; eauto].
+      apply IHSTEP; [reflexivity | reflexivity].
+    - eapply S_Sched2_R; [| rewrite EQ1; eauto | rewrite EQ2; eauto].
+      apply IHSTEP; [reflexivity | reflexivity].
+    - eapply S_Sched3_L ; [| rewrite EQ1; eauto | rewrite EQ2; eauto].
+      apply IHSTEP; [reflexivity | reflexivity].
+    - eapply S_Sched3_R ; [| rewrite EQ1; eauto | rewrite EQ2; eauto].
+      apply IHSTEP; [reflexivity | reflexivity].
+    - eapply S_Sched3_S ; [| rewrite EQ1; eauto | rewrite EQ2; eauto].
+      apply IHSTEP; [reflexivity | reflexivity].
+  Qed.
+
   CoInductive bisim_old : ccs -> ccs -> Prop :=
     BiSim : forall P Q,
       ((forall a P' (PStep : step P a P'), exists Q', step Q a Q' /\ bisim_old P' Q')
@@ -388,10 +416,13 @@ Section Semantics.
     forall P a Q, step (Tau P) a Q -> step P a Q.
   Proof.
     intros.
-    inversion H; subst; auto.
-    (* apply eqit_inv in H1. *)
-    all: admit.
-  Admitted.
+    inversion H; subst.
+    all: try now apply eqit_inv in H0.
+    all: apply eqit_inv in H1;
+      cbn in H1.
+    now rewrite H1.
+    all: contradiction.
+  Qed.
 
   Lemma example1: bisim_old (act (↓ "a") ;; done)
                             (Tau (act (↓ "a");; done)).
@@ -713,33 +744,6 @@ Section EquivSem.
       + constructor; auto.
   Qed.
 
-  Global Instance eq_itree_step_ccs :
-    Proper (eq_itree eq ==> eq ==> eq_itree eq ==> flip impl) step_ccs.
-  Proof.
-    do 6 red; intros * EQ1 * -> * EQ2 STEP.
-    revert x EQ1 x0 EQ2.
-    induction STEP; intros.
-    - apply S_Tau with P.
-      + now apply IHSTEP.
-      + etransitivity; eauto.
-    - apply S_Act; rewrite EQ1,H; apply eqit_bind; [reflexivity | intros ?; symmetry; auto].
-    - apply S_Synch; rewrite EQ1,H; apply eqit_bind; [reflexivity | intros ?; symmetry; auto].
-    - eapply S_Plus_L; [| rewrite EQ1; eauto].
-      apply IHSTEP; [reflexivity | auto].
-    - eapply S_Plus_R; [| rewrite EQ1; eauto].
-      apply IHSTEP; [reflexivity | auto].
-    - eapply S_Sched2_L; [| rewrite EQ1; eauto | rewrite EQ2; eauto].
-      apply IHSTEP; [reflexivity | reflexivity].
-    - eapply S_Sched2_R; [| rewrite EQ1; eauto | rewrite EQ2; eauto].
-      apply IHSTEP; [reflexivity | reflexivity].
-    - eapply S_Sched3_L ; [| rewrite EQ1; eauto | rewrite EQ2; eauto].
-      apply IHSTEP; [reflexivity | reflexivity].
-    - eapply S_Sched3_R ; [| rewrite EQ1; eauto | rewrite EQ2; eauto].
-      apply IHSTEP; [reflexivity | reflexivity].
-    - eapply S_Sched3_S ; [| rewrite EQ1; eauto | rewrite EQ2; eauto].
-      apply IHSTEP; [reflexivity | reflexivity].
-  Qed.
-
   Inductive Finite {E X} : itree E X -> Prop :=
   | FRet : forall x t, t ≅ Ret x -> Finite t
   | FTau : forall P t, t ≅ Tau P -> Finite P -> Finite t
@@ -913,6 +917,11 @@ Section EquivSem.
     FiniteSchedTree t ->
     step_ccs (k x) a t' ->
     step_ccs (x <- t;; k x) a t'.
+  Proof.
+    (* TODO
+       for some reason the goal here is
+       step_ccs (x0 <- t;; k x0) a t'
+       with x0 coming out of nowhere instead of x ??? *)
   Admitted.
 
   Theorem step_ccs_get_hd_returns : forall P a P',
@@ -920,7 +929,7 @@ Section EquivSem.
       ->
       Returns_legacy (headify a P') (get_hd P).
   Proof.
- Admitted.
+  Admitted.
 
   Theorem get_hd_means_step_deprecated : forall P a P',
       Returns_legacy (headify a P') (get_hd P)
@@ -941,7 +950,7 @@ Section EquivSem.
         pose proof (itree_eta P) as EQ.
         rewrite EQ.
         apply get_hd_eq_itree in EQ.
-        rewrite H in EQ; clear H.
+        rewrite H in EQ. clear H.
         destruct (observe P).
         * (* Can't be a Ret *)
           rewrite get_hd_unfold in EQ; cbn in EQ.
