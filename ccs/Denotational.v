@@ -887,6 +887,49 @@ Section EquivSem.
           now eapply FSTRet.
   Qed.
 
+  Notation para_ P Q :=
+    (rP <- get_hd P;;
+    rQ <- get_hd Q;;
+    match rP, rQ with
+    | HDone, HDone => done
+    | HDone, _ => Q
+    | _, HDone => P
+    | HAct a P', HAct b Q' =>
+      if are_opposite a b
+      then
+        branch3 (vis (Act a) (fun _ => para P' (vis (Act b) (fun _ => Q'))))
+                (vis (Act b) (fun _ => para (vis (Act a) (fun _ => P')) Q'))
+                (vis Synch   (fun _ => para P' Q'))
+      else
+        branch2 (vis (Act a) (fun _ => para P' (vis (Act b) (fun _ => Q'))))
+                (vis (Act b) (fun _ => para (vis (Act a) (fun _ => P')) Q'))
+    | HAct a P', HSynch Q' =>
+      branch2 (vis (Act a) (fun _ => para P' (vis Synch (fun _ => Q'))))
+              (vis Synch   (fun _ => para (vis (Act a) (fun _ => P')) Q'))
+    | HSynch P', HAct a Q' =>
+      branch2 (vis Synch   (fun _ => para P' (vis (Act a) (fun _ => Q'))))
+              (vis (Act a) (fun _ => para (vis Synch (fun _ => P')) Q'))
+    | HSynch P', HSynch Q' =>
+      branch2 (vis Synch   (fun _ => para P' (vis Synch (fun _ => Q'))))
+              (vis Synch   (fun _ => para (vis Synch (fun _ => P')) Q'))
+    end)%itree.
+
+  Lemma para_unfold : forall P Q, para P Q ≅ para_ P Q.
+  Proof.
+    intros.
+    apply observing_sub_eqit.
+    constructor.
+    reflexivity.
+  Qed.
+
+  Lemma finite_bind {E X Y} : forall (t: itree E Y) (k: Y -> itree E X) (y: Y),
+      Finite t -> (forall y, Finite (k y)) -> Finite (y <- t;; k y).
+  Proof.
+    intros t k y H.
+    induction H;
+      intros.
+  Admitted.
+
   Theorem finite_model : forall P, Finite (model P).
   Proof.
     induction P;
