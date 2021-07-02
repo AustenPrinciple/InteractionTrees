@@ -714,18 +714,18 @@ Section EquivSem.
     reflexivity.
   Qed.
 
-  Definition eq_head : head -> head -> Prop :=
+  Definition eq_head R : head -> head -> Prop :=
   fun h1 h2 =>
   match h1,h2 with
    | HDone, HDone => True
-   | HSynch t1, HSynch t2 => t1 ≅ t2
-   | HAct a1 t1, HAct a2 t2 => a1 = a2 /\ t1 ≅ t2
+   | HSynch t1, HSynch t2 => eq_itree R t1 t2
+   | HAct a1 t1, HAct a2 t2 => a1 = a2 /\ eq_itree R t1 t2
    | _, _ => False
   end.
   Hint Unfold eq_head : core.
 
-  Global Instance get_hd_eq_itree :
-    Proper (eq_itree eq ==> eq_itree eq_head) get_hd.
+  Global Instance get_hd_eq_itree {R} :
+    Proper (eq_itree R ==> eq_itree (eq_head R)) get_hd.
   Proof.
     do 2 red.
     ginit.
