@@ -925,9 +925,10 @@ Section EquivSem.
   Lemma finite_bind {E X Y} : forall (t: itree E Y) (k: Y -> itree E X) (y: Y),
       Finite t -> (forall y, Finite (k y)) -> Finite (y <- t;; k y).
   Proof.
-    intros t k y H.
-    induction H;
-      intros.
+    intros t k y Fin.
+    induction Fin;
+      intros FinK.
+    -
   Admitted.
 
   Theorem finite_model : forall P, Finite (model P).
@@ -942,7 +943,38 @@ Section EquivSem.
       rewrite bind_trigger.
       now eapply FVis.
     - (* para *)
-      admit.
+      rewrite para_unfold.
+      apply finite_bind.
+      + (* what??? exact HDone ??*) admit.
+      + apply FST_means_Finite.
+        now apply finite_head.
+      + intro rP.
+        apply finite_bind.
+        * (* what??? exact a1 ??*) admit.
+        * apply FST_means_Finite.
+          now apply finite_head.
+        * intro rQ.
+          destruct rP, rQ;
+            try assumption.
+          -- now apply FRet with eq tt.
+          -- unfold branch2.
+             rewrite bind_trigger.
+             eapply FVis.
+             ++ reflexivity.
+             ++ intro.
+                cbn.
+                case_eq x; intro; subst.
+                ** eapply FVis.
+                   --- reflexivity.
+                   --- intro; cbn.
+                       admit.
+                ** eapply FVis.
+                   --- reflexivity.
+                   --- intro; cbn.
+                       admit.
+          -- admit.
+          -- admit.
+          -- admit.
     - (* plus *)
       unfold plus.
       rewrite bind_trigger.
@@ -972,6 +1004,7 @@ Section EquivSem.
     step_ccs (k x) a t' ->
     step_ccs (x <- t;; k x) a t'.
   Proof.
+    intros.
     (* TODO
        for some reason the goal here is
        step_ccs (x0 <- t;; k x0) a t'
@@ -983,6 +1016,11 @@ Section EquivSem.
       ->
       Returns_legacy (headify a P') (get_hd P).
   Proof.
+    intros.
+    induction H.
+    - pose proof (get_hd_unfold (Tau P)) as Eq;
+        cbn in Eq.
+      (* rewrite <- H0 in Eq. *)
   Admitted.
 
   Theorem get_hd_means_step_deprecated : forall P a P',
@@ -1107,17 +1145,21 @@ Section EquivSem.
       exists P'.
       split; [| right; auto].
       clear CIH r.
-      induction StepOp; try now constructor.
-      + clear StepOp.
-        red.
-        cbn.
-        red in IHStepOp.
-        admit.
-      + admit.
-      + clear StepOp.
+      induction StepOp;
+        try now constructor.
+      + (* Plus Left *)
         red; red in IHStepOp.
         cbn.
-        admit.
+        now apply S_Plus_L with (model P) (model Q).
+      + (* Plus Right *)
+        red; red in IHStepOp.
+        cbn.
+        now apply S_Plus_R with (model P) (model Q).
+      + (* Para Left-first *)
+        red; red in IHStepOp.
+        cbn.
+        eapply S_Sched2_L;
+          admit.
         (*
 
           (ax,kP) <- get_hd P;
@@ -1149,9 +1191,19 @@ Section EquivSem.
 
 
         *)
-      + admit.
-      + admit.
-      + admit.
+      + (* Para Right-first *)
+        red; red in IHStepOp.
+        cbn.
+        eapply S_Sched2_R;
+          admit.
+      + (* Para Synch *)
+        red; red in IHStepOp1; red in IHStepOp2.
+        cbn.
+        admit.
+      + (* Restrict *)
+        red; red in IHStepOp.
+        cbn.
+        admit.
 
 (*
       rename P' into Po.
