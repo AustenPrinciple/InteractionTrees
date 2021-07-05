@@ -508,7 +508,6 @@ Section EquivSem.
   Qed.
   Hint Resolve bisimF_mon : paco.
 
-
   Definition headify a :=
     match a with
     | Some a => HAct a
@@ -706,7 +705,7 @@ Section EquivSem.
   .
 
   Lemma get_hd_unfold : forall P,
-    get_hd P ≅ get_hd_ P.
+      get_hd P ≅ get_hd_ P.
   Proof.
     intros.
     apply observing_sub_eqit.
@@ -715,13 +714,13 @@ Section EquivSem.
   Qed.
 
   Definition eq_head R : head -> head -> Prop :=
-  fun h1 h2 =>
-  match h1,h2 with
-   | HDone, HDone => True
-   | HSynch t1, HSynch t2 => eq_itree R t1 t2
-   | HAct a1 t1, HAct a2 t2 => a1 = a2 /\ eq_itree R t1 t2
-   | _, _ => False
-  end.
+    fun h1 h2 =>
+      match h1,h2 with
+      | HDone, HDone => True
+      | HSynch t1, HSynch t2 => eq_itree R t1 t2
+      | HAct a1 t1, HAct a2 t2 => a1 = a2 /\ eq_itree R t1 t2
+      | _, _ => False
+      end.
   Hint Unfold eq_head : core.
 
   Global Instance get_hd_eq_itree {R} :
@@ -1042,7 +1041,7 @@ Section EquivSem.
         pose proof (itree_eta P) as EQ.
         rewrite EQ.
         apply get_hd_eq_itree in EQ.
-        rewrite H in EQ. clear H.
+        rewrite H in EQ; clear H.
         destruct (observe P).
         * (* Can't be a Ret *)
           rewrite get_hd_unfold in EQ; cbn in EQ.
@@ -1102,12 +1101,6 @@ Section EquivSem.
       + admit.
       + admit.
   Admitted.
-
-(* para P Q ~~ get_hd P;; get_hd Q;; fait la comm
-  step_ccs t a t' -> step_ccs (get_hd P;;
-
-*)
-
 
   Theorem get_hd_always_returns : forall P, exists a k, Returns (headify a k) (get_hd (model P)).
   Proof.
