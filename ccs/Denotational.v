@@ -921,14 +921,36 @@ Section EquivSem.
     reflexivity.
   Qed.
 
-  Lemma finite_bind {E X Y} : forall (t: itree E Y) (k: Y -> itree E X) (y: Y),
+  Lemma finite_bind {E X Y} : forall (t: itree E Y) (k: Y -> itree E X),
       Finite t -> (forall y, Finite (k y)) -> Finite (y <- t;; k y).
   Proof.
-    intros t k y Fin.
+    intros t k Fin.
     induction Fin;
       intros FinK.
-    -
+    - apply eqitree_inv_Ret_r in H; destruct H as (r' & _ & EQ).
+      rewrite unfold_bind, EQ; auto.
+    - 
   Admitted.
+
+  Lemma Finite_interp : forall {E F X} (h : Handler E F) (t : itree E X),
+    Finite t ->
+    (forall Y (e : E Y), Finite (h _ e)) ->
+    Finite (interp h t). 
+  Proof.
+  Admitted.
+
+(* In order to prove that : [forall P, finite (model P)],
+    we need to reason about the co-recursive call performed by para.
+    However, this call does not take place on immediately structurally smaller
+    arguments, whether on the syntactic level via model nor on the trees themselves.
+    One sensible first step is to introduce an intermediate result on [para]:
+    [forall t s, Finite t -> Finite s -> Finite (para t s)]
+    As mentionned above however, this is still not the panacea: [Finite] essentially
+    gives structural induction on your tree, but the call is still not structural.
+    Hence we probably need to introduce the size of finite trees and proceed by 
+    strong induction on the sum of the sizes of both trees, which requires quite 
+    a bit of boilerplate and work.
+*)
 
   Theorem finite_model : forall P, Finite (model P).
   Proof.
@@ -942,14 +964,16 @@ Section EquivSem.
       rewrite bind_trigger.
       now eapply FVis.
     - (* para *)
+(* 
+
+*)
+
       rewrite para_unfold.
       apply finite_bind.
-      + (* what??? exact HDone ??*) admit.
       + apply FST_means_Finite.
         now apply finite_head.
       + intro rP.
         apply finite_bind.
-        * (* what??? exact a1 ??*) admit.
         * apply FST_means_Finite.
           now apply finite_head.
         * intro rQ.
@@ -965,7 +989,7 @@ Section EquivSem.
                 case_eq x; intro; subst.
                 ** eapply FVis.
                    --- reflexivity.
-                   --- intro; cbn.
+                   --- intros []; cbn.
                        admit.
                 ** eapply FVis.
                    --- reflexivity.
@@ -983,7 +1007,7 @@ Section EquivSem.
         case_eq b;
           auto.
     - (* restrict *)
-      admit.
+      apply Finite_interp; auto.
   Admitted.
 
   Lemma get_hd_FST : forall P, FiniteSchedTree (get_hd (model P)).
@@ -995,15 +1019,14 @@ Section EquivSem.
    x <- get_hd P;
    y <- get_hd Q;
    Sched de la bonne action
-
 *)
 
-  Lemma FST_prefix_can_step : forall {X} (t : itree ccsE X) (k : X -> ccs) x a t',
-    FiniteSchedTree t ->
-    step_ccs (k x) a t' ->
-    step_ccs (x <- t;; k x) a t'.
-  Proof.
-    intros.
+Lemma FST_prefix_can_step : 
+forall {X} (t : itree ccsE X) (k : X -> ccs) a t',
+FiniteSchedTree t ->
+(forall x, step_ccs (k x) a t') ->
+step_ccs (x <- t;; k x) a t'.
+Proof.
     (* TODO
        for some reason the goal here is
        step_ccs (x0 <- t;; k x0) a t'
