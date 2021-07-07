@@ -927,16 +927,57 @@ Section EquivSem.
     intros t k Fin.
     induction Fin;
       intros FinK.
-    - apply eqitree_inv_Ret_r in H; destruct H as (r' & _ & EQ).
-      rewrite unfold_bind, EQ; auto.
-    - 
+    - apply eqitree_inv_Ret_r in H as [r' [_ Eq]].
+      now rewrite unfold_bind, Eq.
+    - apply eqitree_inv_Tau_r in H as [t' [Eq Rel]].
+      rewrite unfold_bind, Eq.
+      eapply FTau.
+      + reflexivity.
+      + apply IHFin in FinK.
+        admit.
+    - apply eqitree_inv_Vis_r in H as [k' [Eq Rel]].
+      rewrite unfold_bind, Eq.
+      eapply FVis.
+      + reflexivity.
+      + cbn.
+        intros.
+        apply H1 with x in FinK.
+        admit.
   Admitted.
 
-  Lemma Finite_interp : forall {E F X} (h : Handler E F) (t : itree E X),
-    Finite t ->
-    (forall Y (e : E Y), Finite (h _ e)) ->
-    Finite (interp h t). 
+  Lemma finite_interp {E F X} : forall (h : Handler E F) (t : itree E X),
+      Finite t ->
+      (forall Y (e : E Y), Finite (h _ e)) ->
+      Finite (interp h t).
   Proof.
+    intros h t FinT.
+    revert h.
+    induction FinT;
+      intros.
+    - apply eqitree_inv_Ret_r in H as [r' [_ Eq]].
+      rewrite unfold_interp;
+        unfold _interp;
+        rewrite Eq.
+      now apply FRet with eq r'.
+    - apply eqitree_inv_Tau_r in H as [t' [Eq Rel]].
+      rewrite unfold_interp;
+        unfold _interp;
+        rewrite Eq.
+      apply FTau with eq (interp h t').
+      + reflexivity.
+      + apply IHFinT in H0.
+        admit.
+    - apply eqitree_inv_Vis_r in H as [k' [Eq Rel]].
+      rewrite unfold_interp;
+        unfold _interp;
+        rewrite Eq.
+      apply finite_bind.
+      + apply H2.
+      + intro.
+        apply FTau with eq (interp h (k' y)).
+        * reflexivity.
+        * apply H1 with (x := y) in H2.
+          admit.
   Admitted.
 
 (* In order to prove that : [forall P, finite (model P)],
@@ -947,8 +988,8 @@ Section EquivSem.
     [forall t s, Finite t -> Finite s -> Finite (para t s)]
     As mentionned above however, this is still not the panacea: [Finite] essentially
     gives structural induction on your tree, but the call is still not structural.
-    Hence we probably need to introduce the size of finite trees and proceed by 
-    strong induction on the sum of the sizes of both trees, which requires quite 
+    Hence we probably need to introduce the size of finite trees and proceed by
+    strong induction on the sum of the sizes of both trees, which requires quite
     a bit of boilerplate and work.
 *)
 
@@ -964,10 +1005,6 @@ Section EquivSem.
       rewrite bind_trigger.
       now eapply FVis.
     - (* para *)
-(* 
-
-*)
-
       rewrite para_unfold.
       apply finite_bind.
       + apply FST_means_Finite.
@@ -1007,7 +1044,9 @@ Section EquivSem.
         case_eq b;
           auto.
     - (* restrict *)
-      apply Finite_interp; auto.
+      apply finite_interp.
+      + assumption.
+      + admit.
   Admitted.
 
   Lemma get_hd_FST : forall P, FiniteSchedTree (get_hd (model P)).
@@ -1015,22 +1054,19 @@ Section EquivSem.
     intros; eapply finite_head, finite_model.
   Qed.
 
-(* para (model P) (model Q) ~~
-   x <- get_hd P;
-   y <- get_hd Q;
-   Sched de la bonne action
-*)
-
-Lemma FST_prefix_can_step : 
-forall {X} (t : itree ccsE X) (k : X -> ccs) a t',
-FiniteSchedTree t ->
-(forall x, step_ccs (k x) a t') ->
-step_ccs (x <- t;; k x) a t'.
-Proof.
-    (* TODO
-       for some reason the goal here is
-       step_ccs (x0 <- t;; k x0) a t'
-       with x0 coming out of nowhere instead of x ??? *)
+  Lemma FST_prefix_can_step {X} : forall (t : ccsT X) (k : X -> ccs) a t',
+      FiniteSchedTree t ->
+      (forall x, step_ccs (k x) a t') ->
+      step_ccs (x <- t;; k x) a t'.
+  Proof.
+    intros.
+    induction H.
+    - apply eqitree_inv_Ret_r in H as [r' [_ Eq]].
+      now rewrite unfold_bind, Eq.
+    - apply eqitree_inv_Tau_r in H as [t0 [Eq Rel]].
+      rewrite unfold_bind, Eq.
+      apply S_Tau with (x <- t0;; k x).
+      + 
   Admitted.
 
   Theorem step_ccs_get_hd_returns : forall P a P',
@@ -1129,9 +1165,7 @@ Proof.
   Proof.
     induction P.
     - simpl.
-      Print headify.
-      Check Returns.
-  Abort.
+  Admitted.
 
     (* écrire :
       prédicat finite
