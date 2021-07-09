@@ -1311,9 +1311,7 @@ Section EquivSem.
                unfold act.
                rewrite bind_trigger; apply eqit_Vis; intros []. (* TODO: eqitree_vis to avoid exposing [eqit] *)
                reflexivity.
-               (* This is very weird I think there's a mistake in S_Sched_L *)
-               (* But also, we lost the relation between Q and whatever's there *)
-               admit.
+               reflexivity.
              }
              {
                eapply S_Sched2_L; [| reflexivity |].
@@ -1321,26 +1319,17 @@ Section EquivSem.
                unfold act.
                rewrite bind_trigger; apply eqit_Vis; intros []. (* TODO: eqitree_vis to avoid exposing [eqit] *)
                reflexivity.
-               (* This is very weird I think there's a mistake in S_Sched_L *)
-               (* But also, we lost the relation between Q and whatever's there *)
-               admit.
+               reflexivity.
              }
              {
                destruct (are_opposite a1 a0).
                eapply S_Sched3_L; [constructor; unfold act; rewrite bind_trigger; apply eqit_Vis; intros []; reflexivity | reflexivity | ].
-               (* This is very weird I think there's a mistake in S_Sched_L *)
-               (* But also, we lost the relation between Q and whatever's there *)
-               admit.
-               eapply S_Sched2_L; [constructor; unfold act; rewrite bind_trigger; apply eqit_Vis; intros []; reflexivity | reflexivity | ].
-               (* This is very weird I think there's a mistake in S_Sched_L *)
-               (* But also, we lost the relation between Q and whatever's there *)
-               admit.
+               - reflexivity.
+               - eapply S_Sched2_L; [constructor; unfold act; rewrite bind_trigger; apply eqit_Vis; intros []; reflexivity | reflexivity | ].
+                 reflexivity.
              }
              eapply S_Sched2_L; [constructor; unfold act; rewrite bind_trigger; apply eqit_Vis; intros []; reflexivity | reflexivity | ].
-             (* This is very weird I think there's a mistake in S_Sched_L *)
-             (* But also, we lost the relation between Q and whatever's there *)
-             admit.
-
+             reflexivity.
         (*
 
           (ax,kP) <- get_hd P;
