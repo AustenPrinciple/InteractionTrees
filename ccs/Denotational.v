@@ -100,7 +100,12 @@ Section Semantics.
       end
   .
 
-  Definition para_old : ccs -> ccs -> ccs :=
+  (* This version of para avoids requesting unecessary schedules: if it's gonna give the get-go to P,
+    then it doesn't compute the head of Q.
+    The drawback is that it has branches ending in dynamic failure: if we have decided to have them synch,
+    then any path to incompatible heads has to be killed.
+      *)
+  Definition para_dead : ccs -> ccs -> ccs :=
     cofix F (P : ccs) (Q : ccs) :=
       branch3
         (x <- get_hd P;;
@@ -129,7 +134,13 @@ Section Semantics.
         )
   .
 
-  Definition para : ccs -> ccs -> ccs :=
+  (* TODO: Reuse full P/Q when their head are ditched 
+     TODO: cas done asymmetric problematic
+     Note: We make the scheduler do useless work multiple times
+     Question: Could we carry the set of finitely reachable actions at finite depth in the tree?
+     Question: Can we always collapse the scheduling head into a single event?
+  *)
+  Definition para_commit_even_if_not_stepping : ccs -> ccs -> ccs :=
     cofix F (P : ccs) (Q : ccs) :=
       rP <- get_hd P;;
       rQ <- get_hd Q;;
@@ -157,6 +168,34 @@ Section Semantics.
                 (vis Synch   (fun _ => F (vis Synch (fun _ => P')) Q'))
       end.
 
+  Definition para : ccs -> ccs -> ccs :=
+      cofix F (P : ccs) (Q : ccs) :=
+        rP <- get_hd P;;
+        rQ <- get_hd Q;;
+        match rP, rQ with
+          | HDone, HDone => done
+          | HDone, _ => Q
+          | _, HDone => P
+          | HAct a P', HAct b Q' =>
+            if are_opposite a b
+            then
+              branch3 (vis (Act a) (fun _ => F P' Q))
+                      (vis (Act b) (fun _ => F P Q'))
+                      (vis Synch   (fun _ => F P' Q'))
+            else
+              branch2 (vis (Act a) (fun _ => F P' Q))
+                      (vis (Act b) (fun _ => F P Q'))
+          | HAct a P', HSynch Q' =>
+            branch2 (vis (Act a) (fun _ => F P' Q))
+                    (vis Synch   (fun _ => F P Q'))
+          | HSynch P', HAct a Q' =>
+            branch2 (vis Synch   (fun _ => F P' Q))
+                    (vis (Act a) (fun _ => F P Q'))
+          | HSynch P', HSynch Q' =>
+            branch2 (vis Synch   (fun _ => F P' Q))
+                    (vis Synch   (fun _ => F P Q'))
+          end.
+    
   Definition h_trigger {E F} `{E -< F} : E ~> itree F :=
     fun _ e => trigger e.
 
@@ -219,28 +258,28 @@ Section Semantics.
   | S_Sched2_L : forall a P P' L L' R,
       step L a L' ->
       P ≅ branch2 L R ->
-      P' ≅ branch2 L' R ->
+      P' ≅ L' ->
       step P a P'
   | S_Sched2_R : forall a P P' L R R',
       step R a R' ->
       P ≅ branch2 L R ->
-      P' ≅ branch2 L R' ->
+      P' ≅ R' ->
       step P a P'
   (* Three-way parallelism *)
   | S_Sched3_L : forall a P P' L L' R S,
       step L a L' ->
       P ≅ branch3 L R S ->
-      P' ≅ branch3 L' R S ->
+      P' ≅ L' ->
       step P a P'
   | S_Sched3_R : forall a P P' L R R' S,
       step R a R' ->
       P ≅ branch3 L R S ->
-      P' ≅ branch3 L R' S ->
+      P' ≅ R' ->
       step P a P'
   | S_Sched3_S : forall a P P' L R S S',
       step S a S' ->
       P ≅ branch3 L R S ->
-      P' ≅ branch3 L R S' ->
+      P' ≅ S' ->
       step P a P'.
 
   Global Instance eq_itree_step :
@@ -896,21 +935,21 @@ Section EquivSem.
     | HAct a P', HAct b Q' =>
       if are_opposite a b
       then
-        branch3 (vis (Act a) (fun _ => para P' (vis (Act b) (fun _ => Q'))))
-                (vis (Act b) (fun _ => para (vis (Act a) (fun _ => P')) Q'))
+        branch3 (vis (Act a) (fun _ => para P' Q))
+                (vis (Act b) (fun _ => para P Q'))
                 (vis Synch   (fun _ => para P' Q'))
       else
-        branch2 (vis (Act a) (fun _ => para P' (vis (Act b) (fun _ => Q'))))
-                (vis (Act b) (fun _ => para (vis (Act a) (fun _ => P')) Q'))
+        branch2 (vis (Act a) (fun _ => para P' Q))
+                (vis (Act b) (fun _ => para P Q'))
     | HAct a P', HSynch Q' =>
-      branch2 (vis (Act a) (fun _ => para P' (vis Synch (fun _ => Q'))))
-              (vis Synch   (fun _ => para (vis (Act a) (fun _ => P')) Q'))
+      branch2 (vis (Act a) (fun _ => para P' Q))
+              (vis Synch   (fun _ => para P Q'))
     | HSynch P', HAct a Q' =>
-      branch2 (vis Synch   (fun _ => para P' (vis (Act a) (fun _ => Q'))))
-              (vis (Act a) (fun _ => para (vis Synch (fun _ => P')) Q'))
+      branch2 (vis Synch   (fun _ => para P' Q))
+              (vis (Act a) (fun _ => para P Q'))
     | HSynch P', HSynch Q' =>
-      branch2 (vis Synch   (fun _ => para P' (vis Synch (fun _ => Q'))))
-              (vis Synch   (fun _ => para (vis Synch (fun _ => P')) Q'))
+      branch2 (vis Synch   (fun _ => para P' Q))
+              (vis Synch   (fun _ => para P Q'))
     end)%itree.
 
   Lemma para_unfold : forall P Q, para P Q ≅ para_ P Q.
@@ -1246,18 +1285,26 @@ Section EquivSem.
         now apply S_Plus_R with (model P) (model Q).
       + (* Para Left-first *)
         red; red in IHStepOp.
+        clear StepOp.
         cbn.
         rewrite para_unfold.
         apply step_ccs_through_FST with (headify a ⟦P'⟧).
-        3: apply step_ccs_through_FST_weak.
-        * apply finite_get_hd_FST, model_finite.
-        * apply step_ccs_get_hd_returns; assumption.
-        * apply finite_get_hd_FST, model_finite.
-        * intros hd; destruct hd eqn:EQHD, a eqn:EQa; cbn.
-          (* Case where Q returns HDone. To think about *)
-          admit.
-          (* Case where Q returns HDone. To think about *)
-          admit.
+        apply finite_get_hd_FST, model_finite.
+        apply step_ccs_get_hd_returns; assumption.
+        apply 
+          (step_ccs_through_FST_weak 
+             (get_hd ⟦Q⟧) _ (para ⟦ P' ⟧ ⟦ Q ⟧) a).
+       * apply finite_get_hd_FST, model_finite.
+       * intros hd.
+         destruct hd eqn:EQHD, a eqn:EQa; cbn.
+          { 
+            (* Case where Q returns HDone. To think about *)
+            admit.
+          }
+          {
+            (* Case where Q returns HDone. To think about *)
+            admit.
+          }
           { 
             eapply S_Sched2_L; [| reflexivity |].
             apply S_Act.
