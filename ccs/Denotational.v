@@ -743,27 +743,27 @@ Section EquivSem.
       + constructor; auto.
   Qed.
 
-  Inductive Finite {E X} : itree E X -> Prop :=
-  | FRet : forall R t (x: X), eq_itree R t (Ret x) -> Finite t
-  | FTau : forall R t P, eq_itree R t (Tau P) -> Finite P -> Finite t
+  Inductive Finite {E X} : (X -> X -> Prop) -> itree E X -> Prop :=
+  | FRet : forall R t (x: X), eq_itree R t (Ret x) -> Finite R t
+  | FTau : forall R t P, eq_itree R t (Tau P) -> Finite R P -> Finite R t
   | FVis {A} : forall R t (e: E A) k,
-      eq_itree R t (Vis e k) -> (forall x, Finite (k x)) -> Finite t.
+      eq_itree R t (Vis e k) -> (forall x, Finite R (k x)) -> Finite R t.
 
-  Inductive FiniteSchedTree {X} : itree ccsE X -> Prop :=
-  | FSTRet : forall R t (x: X), eq_itree R t (Ret x) -> FiniteSchedTree t
-  | FSTTau : forall R t P, eq_itree R t (Tau P) -> FiniteSchedTree P -> FiniteSchedTree t
+  Inductive FiniteSchedTree {X} : (X -> X -> Prop) -> ccsT X -> Prop :=
+  | FSTRet : forall R t (x: X), eq_itree R t (Ret x) -> FiniteSchedTree R t
+  | FSTTau : forall R t P, eq_itree R t (Tau P) -> FiniteSchedTree R P -> FiniteSchedTree R t
   | FSTPlus : forall R t k,
       eq_itree R t (b <- trigger Plus;; k b) ->
-      (forall b, FiniteSchedTree (k b)) ->
-      FiniteSchedTree t
+      (forall b, FiniteSchedTree R (k b)) ->
+      FiniteSchedTree R t
   | FSTSched2 : forall R t k,
       eq_itree R t (b <- trigger Sched2;; k b) ->
-      (forall b, FiniteSchedTree (k b)) ->
-      FiniteSchedTree t
+      (forall b, FiniteSchedTree R (k b)) ->
+      FiniteSchedTree R t
   | FSTSched3 : forall R t k,
       eq_itree R t (c <- trigger Sched3;; k c) ->
-      (forall c, FiniteSchedTree (k c)) ->
-      FiniteSchedTree t.
+      (forall c, FiniteSchedTree R (k c)) ->
+      FiniteSchedTree R t.
 
   Lemma FST_means_Finite {X}: forall (P: itree ccsE X), FiniteSchedTree P -> Finite P.
   Proof.
