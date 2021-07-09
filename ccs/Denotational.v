@@ -224,7 +224,7 @@ Section Semantics.
     match t with
     | DoneT         => done
     | ActionT a t   => act a;; model_old t
-    | ParaT t1 t2   => para_old (model_old t1) (model_old t2)
+    | ParaT t1 t2   => para_dead (model_old t1) (model_old t2)
     | PlusT t1 t2   => plus (model_old t1) (model_old t2)
     | RestrictT c t => restrict c (model_old t)
     end.
@@ -1105,7 +1105,7 @@ Section EquivSem.
     - apply eqitree_inv_Tau_r in H as [t0 [Eq Rel]].
       rewrite unfold_bind, Eq.
       apply S_Tau with (x <- t0;; k x).
-      + 
+      +
   Admitted.
 
   Theorem step_ccs_get_hd_returns : forall P a P',
@@ -1228,7 +1228,7 @@ Section EquivSem.
   Notation "P '⊢' a '→sem' Q" := (step_sem P a Q) (at level 50).
   Notation "P '⊢' a '→op'  Q" := (step_op P a Q)  (at level 50).
 
-  Lemma step_ccs_through_FST : 
+  Lemma step_ccs_through_FST :
     forall (t : ccsT head) (k : head -> ccs) (q : ccs) a hd,
      FiniteSchedTree t ->
      Returns_legacy hd t ->
@@ -1236,18 +1236,18 @@ Section EquivSem.
      (hd <- t;; k hd) ⊢ a →ccs q.
   Admitted.
 
-  Lemma step_ccs_through_FST_weak : 
+  Lemma step_ccs_through_FST_weak :
     forall (t : ccsT head) (k : head -> ccs) (q : ccs) a,
      FiniteSchedTree t ->
      (forall hd, k hd ⊢ a →ccs q) ->
      (hd <- t;; k hd) ⊢ a →ccs q.
   Admitted.
 
-  Lemma step_ccs_is_returned_by_get_hd : 
+  Lemma step_ccs_is_returned_by_get_hd :
     forall (p q : ccs) a,
       p ⊢ a →ccs q ->
-      Returns_legacy (headify a q) (get_hd p). 
-  Admitted.     
+      Returns_legacy (headify a q) (get_hd p).
+  Admitted.
 
   Lemma finite_get_hd_FST : forall (p : ccs),
     Finite p ->
@@ -1289,57 +1289,57 @@ Section EquivSem.
         cbn.
         rewrite para_unfold.
         apply step_ccs_through_FST with (headify a ⟦P'⟧).
-        apply finite_get_hd_FST, model_finite.
-        apply step_ccs_get_hd_returns; assumption.
-        apply 
-          (step_ccs_through_FST_weak 
+        * apply finite_get_hd_FST, model_finite.
+        * now apply step_ccs_get_hd_returns.
+        * apply
+          (step_ccs_through_FST_weak
              (get_hd ⟦Q⟧) _ (para ⟦ P' ⟧ ⟦ Q ⟧) a).
-       * apply finite_get_hd_FST, model_finite.
-       * intros hd.
-         destruct hd eqn:EQHD, a eqn:EQa; cbn.
-          { 
-            (* Case where Q returns HDone. To think about *)
-            admit.
-          }
-          {
-            (* Case where Q returns HDone. To think about *)
-            admit.
-          }
-          { 
-            eapply S_Sched2_L; [| reflexivity |].
-            apply S_Act.
-            unfold act. 
-            rewrite bind_trigger; apply eqit_Vis; intros []. (* TODO: eqitree_vis to avoid exposing [eqit] *)
-            reflexivity.
-            (* This is very weird I think there's a mistake in S_Sched_L *)
-            (* But also, we lost the relation between Q and whatever's there *)
-            admit. 
-          }
-          {
-            eapply S_Sched2_L; [| reflexivity |].
-            apply S_Synch.
-            unfold act. 
-            rewrite bind_trigger; apply eqit_Vis; intros []. (* TODO: eqitree_vis to avoid exposing [eqit] *)
-            reflexivity.
-            (* This is very weird I think there's a mistake in S_Sched_L *)
-            (* But also, we lost the relation between Q and whatever's there *)
-            admit. 
-          }
-          {
-            destruct (are_opposite a1 a0).
-            eapply S_Sched3_L; [constructor; unfold act; rewrite bind_trigger; apply eqit_Vis; intros []; reflexivity | reflexivity | ].
-            (* This is very weird I think there's a mistake in S_Sched_L *)
-            (* But also, we lost the relation between Q and whatever's there *)
-            admit. 
-            eapply S_Sched2_L; [constructor; unfold act; rewrite bind_trigger; apply eqit_Vis; intros []; reflexivity | reflexivity | ].
+          -- apply finite_get_hd_FST, model_finite.
+          -- intros hd.
+             destruct hd eqn:EQHD, a eqn:EQa; cbn.
+             {
+               (* Case where Q returns HDone. To think about *)
+               admit.
+             }
+             {
+               (* Case where Q returns HDone. To think about *)
+               admit.
+             }
+             {
+               eapply S_Sched2_L; [| reflexivity |].
+               apply S_Act.
+               unfold act.
+               rewrite bind_trigger; apply eqit_Vis; intros []. (* TODO: eqitree_vis to avoid exposing [eqit] *)
+               reflexivity.
+               (* This is very weird I think there's a mistake in S_Sched_L *)
+               (* But also, we lost the relation between Q and whatever's there *)
+               admit.
+             }
+             {
+               eapply S_Sched2_L; [| reflexivity |].
+               apply S_Synch.
+               unfold act.
+               rewrite bind_trigger; apply eqit_Vis; intros []. (* TODO: eqitree_vis to avoid exposing [eqit] *)
+               reflexivity.
+               (* This is very weird I think there's a mistake in S_Sched_L *)
+               (* But also, we lost the relation between Q and whatever's there *)
+               admit.
+             }
+             {
+               destruct (are_opposite a1 a0).
+               eapply S_Sched3_L; [constructor; unfold act; rewrite bind_trigger; apply eqit_Vis; intros []; reflexivity | reflexivity | ].
+               (* This is very weird I think there's a mistake in S_Sched_L *)
+               (* But also, we lost the relation between Q and whatever's there *)
+               admit.
+               eapply S_Sched2_L; [constructor; unfold act; rewrite bind_trigger; apply eqit_Vis; intros []; reflexivity | reflexivity | ].
+               (* This is very weird I think there's a mistake in S_Sched_L *)
+               (* But also, we lost the relation between Q and whatever's there *)
+               admit.
+             }
+             eapply S_Sched2_L; [constructor; unfold act; rewrite bind_trigger; apply eqit_Vis; intros []; reflexivity | reflexivity | ].
              (* This is very weird I think there's a mistake in S_Sched_L *)
-            (* But also, we lost the relation between Q and whatever's there *)
-            admit. 
-          }
-            eapply S_Sched2_L; [constructor; unfold act; rewrite bind_trigger; apply eqit_Vis; intros []; reflexivity | reflexivity | ].
-             (* This is very weird I think there's a mistake in S_Sched_L *)
-            (* But also, we lost the relation between Q and whatever's there *)
-            admit. 
+             (* But also, we lost the relation between Q and whatever's there *)
+             admit.
 
         (*
 
@@ -1385,15 +1385,6 @@ Section EquivSem.
         red; red in IHStepOp.
         cbn.
         admit.
-
-(*
-      rename P' into Po.
-        destruct IHStepOp as [Ps [StepSem R]].
-        exists (Ps ∥ Q).
-        split.
-        * Print S_Vis_Sched2_L.
-          admit.
-        * admit. *)
 
     - (* The operational side can simulate the denotational semantics *)
       intros a P' StepSem.
