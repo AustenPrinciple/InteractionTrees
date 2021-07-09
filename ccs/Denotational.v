@@ -765,12 +765,12 @@ Section EquivSem.
       (forall c, FiniteSchedTree R (k c)) ->
       FiniteSchedTree R t.
 
-  Lemma FST_means_Finite {X}: forall (P: itree ccsE X), FiniteSchedTree P -> Finite P.
+  Lemma FST_means_Finite {X} : forall (P: ccsT X) R, FiniteSchedTree R P -> Finite R P.
   Proof.
     intros.
     induction H.
-    - now apply FRet with R x.
-    - now apply FTau with R P.
+    - now apply FRet with x.
+    - now apply FTau with P.
     - rewrite bind_trigger in H.
       eapply FVis;
         eauto.
@@ -782,47 +782,54 @@ Section EquivSem.
         eauto.
   Qed.
 
-  Global Instance Finite_eq_itree {E X} R :
-    Proper (eq_itree R ==> flip impl) (@Finite E X).
+  (*
+  Global Instance Finite_eq_itree {E X} :
+    Proper (eq_itree eq ==> flip impl) (@Finite E X eq).
   Proof.
     do 4 red.
     intros x y Cong Fin.
     revert x Cong.
     induction Fin;
-      intros.
-    - apply FRet with (rcompose R R0) x.
-      eapply eqit_trans;
-        eauto.
-    - apply eqitree_inv_Tau_r in H.
-      destruct H as [t' [Obs Cong']].
-      apply FTau with (rcompose R R0) P.
-      + eapply eqit_trans.
+      intros;
+      assert (R = (rcompose R R)).
+    - admit.
+    - apply FRet with x.
+      rewrite H0.
+      eapply eqit_trans; eauto.
+    - admit.
+    - apply eqitree_inv_Tau_r in H as [t' [Obs Cong']].
+      apply FTau with P.
+      + rewrite H0.
+        eapply eqit_trans.
         * apply Cong.
         * rewrite itree_eta, Obs.
           apply eqit_Tau.
           apply Cong'.
       + assumption.
+    - admit.
     - apply eqitree_inv_Vis_r in H.
       destruct H as [t' [Obs Cong']].
       eapply FVis.
-      + eapply eqit_trans.
+      + rewrite H2.
+        eapply eqit_trans.
         * eauto.
         * rewrite itree_eta, Obs.
           apply eqit_Vis.
           apply Cong'.
       + assumption.
-  Qed.
+  Admitted. *)
 
-  Global Instance FST_eq_itree {X} R :
-    Proper (eq_itree R ==> flip impl) (@FiniteSchedTree X).
+(*
+  Global Instance FST_eq_itree R :
+    Proper (eq_itree (eq_head R) ==> flip impl) (@FiniteSchedTree head (eq_head R)).
   Proof.
     do 4 red.
     intros x y Cong Fin.
     revert x Cong.
     induction Fin;
       intros.
-    - apply FSTRet with (rcompose R R0) x.
-      eapply eqit_trans;
+    - apply FSTRet with x.
+      apply eqit_trans.
         eauto.
     - apply eqitree_inv_Tau_r in H.
       destruct H as [t' [Obs Cong']].
@@ -845,7 +852,7 @@ Section EquivSem.
       + eapply eqit_trans;
           eauto.
       + assumption.
-  Qed.
+  Qed. *)
 
   Ltac break_match_goal :=
     match goal with
@@ -856,16 +863,16 @@ Section EquivSem.
       end
     end.
 
-  Theorem finite_head : forall P, Finite P -> FiniteSchedTree (get_hd P).
+  Theorem finite_head : forall R P, Finite R P -> FiniteSchedTree (eq_head R) (get_hd P).
   Proof.
     intros.
     induction H.
     - (* Ret *)
       pose proof (get_hd_unfold (Ret x)) as Eq;
         cbn in Eq.
-      apply FSTRet with (eq_head R) HDone.
-      apply get_hd_eq_itree in H.
-      now rewrite Eq in H.
+      apply FSTRet with HDone.
+      rewrite <- Eq.
+      now apply get_hd_eq_itree.
     - (* Tau *)
       pose proof (get_hd_unfold (Tau P)) as Eq;
         cbn in Eq.
