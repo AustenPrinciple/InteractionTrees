@@ -174,8 +174,10 @@ Section Semantics.
         rQ <- get_hd Q;;
         match rP, rQ with
           | HDone, HDone => done
-          | HDone, _ => Q
-          | _, HDone => P
+          | HDone, HAct b Q' => vis (Act b) (fun _ => F P Q')
+          | HDone, HSynch Q' => vis Synch   (fun _ => F P Q')
+          | HAct a P', HDone => vis (Act a) (fun _ => F P' Q)
+          | HSynch P', HDone => vis Synch   (fun _ => F P' Q)
           | HAct a P', HAct b Q' =>
             if are_opposite a b
             then
@@ -224,7 +226,7 @@ Section Semantics.
     match t with
     | DoneT         => done
     | ActionT a t   => act a;; model_old t
-    | ParaT t1 t2   => para_old (model_old t1) (model_old t2)
+    | ParaT t1 t2   => para_dead (model_old t1) (model_old t2)
     | PlusT t1 t2   => plus (model_old t1) (model_old t2)
     | RestrictT c t => restrict c (model_old t)
     end.
@@ -930,8 +932,10 @@ Section EquivSem.
     rQ <- get_hd Q;;
     match rP, rQ with
     | HDone, HDone => done
-    | HDone, _ => Q
-    | _, HDone => P
+    | HDone, HAct b Q' => vis (Act b) (fun _ => para P Q')
+    | HDone, HSynch Q' => vis Synch   (fun _ => para P Q')
+    | HAct a P', HDone => vis (Act a) (fun _ => para P' Q)
+    | HSynch P', HDone => vis Synch   (fun _ => para P' Q)
     | HAct a P', HAct b Q' =>
       if are_opposite a b
       then
@@ -1055,7 +1059,10 @@ Section EquivSem.
         * intro rQ.
           destruct rP, rQ;
             try assumption.
-          -- now apply FRet with eq tt.
+          -- now apply FRet with eq tt. 
+          -- admit.
+          -- admit.
+          -- admit.
           -- unfold branch2.
              rewrite bind_trigger.
              eapply FVis.
@@ -1071,6 +1078,7 @@ Section EquivSem.
                    --- reflexivity.
                    --- intro; cbn.
                        admit.
+          -- admit.
           -- admit.
           -- admit.
           -- admit.
@@ -1258,6 +1266,15 @@ Section EquivSem.
     Finite ⟦P⟧.
   Admitted.
 
+  Lemma op_involutive : forall a, op (op a) = a.
+  Proof.
+    intros []; reflexivity.
+  Qed. 
+
+  Lemma action_eq_dec_refl : forall a,
+     exists e, action_eq_dec a a = left e.
+  Admitted.
+ 
   Theorem model_correct_complete :
     forall P, bisim P P.
   Proof.
@@ -1289,98 +1306,52 @@ Section EquivSem.
         cbn.
         rewrite para_unfold.
         apply step_ccs_through_FST with (headify a ⟦P'⟧).
-        apply finite_get_hd_FST, model_finite.
-        apply step_ccs_get_hd_returns; assumption.
-        apply 
-          (step_ccs_through_FST_weak 
-             (get_hd ⟦Q⟧) _ (para ⟦ P' ⟧ ⟦ Q ⟧) a).
-       * apply finite_get_hd_FST, model_finite.
-       * intros hd.
-         destruct hd eqn:EQHD, a eqn:EQa; cbn.
-          { 
-            (* Case where Q returns HDone. To think about *)
-            admit.
-          }
-          {
-            (* Case where Q returns HDone. To think about *)
-            admit.
-          }
-          { 
-            eapply S_Sched2_L; [| reflexivity |].
-            apply S_Act.
-            unfold act. 
-            rewrite bind_trigger; apply eqit_Vis; intros []. (* TODO: eqitree_vis to avoid exposing [eqit] *)
-            reflexivity.
-            (* This is very weird I think there's a mistake in S_Sched_L *)
-            (* But also, we lost the relation between Q and whatever's there *)
-            admit. 
-          }
-          {
-            eapply S_Sched2_L; [| reflexivity |].
-            apply S_Synch.
-            unfold act. 
-            rewrite bind_trigger; apply eqit_Vis; intros []. (* TODO: eqitree_vis to avoid exposing [eqit] *)
-            reflexivity.
-            (* This is very weird I think there's a mistake in S_Sched_L *)
-            (* But also, we lost the relation between Q and whatever's there *)
-            admit. 
-          }
-          {
+        3:apply step_ccs_through_FST_weak.
+        * apply finite_get_hd_FST, model_finite.
+        * apply step_ccs_get_hd_returns; assumption.
+        * apply finite_get_hd_FST, model_finite.
+        * intros hd.
+          destruct hd eqn:EQHD, a eqn:EQa; cbn;
+            try (constructor; unfold act; rewrite bind_trigger; reflexivity);
+            try (eapply S_Sched2_L; [constructor; unfold act; rewrite bind_trigger; reflexivity | reflexivity | reflexivity]).
             destruct (are_opposite a1 a0).
-            eapply S_Sched3_L; [constructor; unfold act; rewrite bind_trigger; apply eqit_Vis; intros []; reflexivity | reflexivity | ].
-            (* This is very weird I think there's a mistake in S_Sched_L *)
-            (* But also, we lost the relation between Q and whatever's there *)
-            admit. 
-            eapply S_Sched2_L; [constructor; unfold act; rewrite bind_trigger; apply eqit_Vis; intros []; reflexivity | reflexivity | ].
-             (* This is very weird I think there's a mistake in S_Sched_L *)
-            (* But also, we lost the relation between Q and whatever's there *)
-            admit. 
-          }
-            eapply S_Sched2_L; [constructor; unfold act; rewrite bind_trigger; apply eqit_Vis; intros []; reflexivity | reflexivity | ].
-             (* This is very weird I think there's a mistake in S_Sched_L *)
-            (* But also, we lost the relation between Q and whatever's there *)
-            admit. 
+            eapply S_Sched3_L; [constructor; unfold act; rewrite bind_trigger; reflexivity | reflexivity | reflexivity].
+            eapply S_Sched2_L; [constructor; unfold act; rewrite bind_trigger; reflexivity | reflexivity | reflexivity].
 
-        (*
-
-          (ax,kP) <- get_hd P;
-          (ay,kQ) <- get_hd Q;
-          b <- Sched2;
-           true -> trigger ax;; para (kP tt) Q
-           false -> trigger ay;; para P (kQ tt)
-
-           step_ccs (model P) !b ∅
-
-           get_hd (choice2 (true -> !a ; false -> !b))
-
-           choice2 (true -> !a,∅; false -> !b,∅
-
-           step_ccs (model P) a (model P') est un chemin
-           dans get_hd (model P) qui mène à la feuille (a,model P')
-           ~> "step_ccs like (get_hd (model P)) a (model P')"
-
-           step_ccs (model P) explore un chemin prefix de choices de (model P)
-           step_ccs (para (model P) (model Q))
-              explore le même chemin prefix de choices,
-              mais dans l'arbre prefix get_hd (model P)
-
-            )
-
-          para t u :
-           a,k <- get_hd t; a',k' <- get_hd u ;
-           choice3
-
-
-        *)
       + (* Para Right-first *)
         red; red in IHStepOp.
+        clear StepOp.
         cbn.
-        eapply S_Sched2_R;
-          admit.
+        rewrite para_unfold.
+        apply step_ccs_through_FST_weak.
+        2: intros hd; apply step_ccs_through_FST with (headify a ⟦Q'⟧).
+        * apply finite_get_hd_FST, model_finite.
+        * apply finite_get_hd_FST, model_finite.
+        * apply step_ccs_get_hd_returns; assumption.
+        * destruct hd eqn:EQHD, a eqn:EQa; cbn;
+            try (constructor; unfold act; rewrite bind_trigger; reflexivity);
+            try (eapply S_Sched2_R; [constructor; unfold act; rewrite bind_trigger; reflexivity | reflexivity | reflexivity]).
+            destruct (are_opposite a0 a1).
+            eapply S_Sched3_R; [constructor; unfold act; rewrite bind_trigger; reflexivity | reflexivity | reflexivity].
+            eapply S_Sched2_R; [constructor; unfold act; rewrite bind_trigger; reflexivity | reflexivity | reflexivity].
+      
       + (* Para Synch *)
         red; red in IHStepOp1; red in IHStepOp2.
+        clear StepOp1 StepOp2.
         cbn.
-        admit.
+        rewrite para_unfold.
+        apply step_ccs_through_FST with (headify (Some a) ⟦P'⟧).
+        3:apply step_ccs_through_FST with (headify (Some (op a)) ⟦Q'⟧).
+        * apply finite_get_hd_FST, model_finite.
+        * apply step_ccs_get_hd_returns; assumption.
+        * apply finite_get_hd_FST, model_finite.
+        * apply step_ccs_get_hd_returns; assumption.
+        * cbn. 
+          unfold are_opposite.
+          rewrite op_involutive.
+          destruct (action_eq_dec_refl a) as (_ & ->).
+          eapply S_Sched3_S; [constructor;rewrite bind_trigger; reflexivity | reflexivity | reflexivity].
+          
       + (* Restrict *)
         red; red in IHStepOp.
         cbn.
