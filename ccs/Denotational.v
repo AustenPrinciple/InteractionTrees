@@ -1113,7 +1113,7 @@ Section EquivSem.
     - apply eqitree_inv_Tau_r in H as [t0 [Eq Rel]].
       rewrite unfold_bind, Eq.
       apply S_Tau with (x <- t0;; k x).
-      + 
+      +
   Admitted.
 
   Theorem step_ccs_get_hd_returns : forall P a P',
@@ -1236,7 +1236,7 @@ Section EquivSem.
   Notation "P '⊢' a '→sem' Q" := (step_sem P a Q) (at level 50).
   Notation "P '⊢' a '→op'  Q" := (step_op P a Q)  (at level 50).
 
-  Lemma step_ccs_through_FST : 
+  Lemma step_ccs_through_FST :
     forall (t : ccsT head) (k : head -> ccs) (q : ccs) a hd,
      FiniteSchedTree t ->
      Returns_legacy hd t ->
@@ -1244,18 +1244,18 @@ Section EquivSem.
      (hd <- t;; k hd) ⊢ a →ccs q.
   Admitted.
 
-  Lemma step_ccs_through_FST_weak : 
+  Lemma step_ccs_through_FST_weak :
     forall (t : ccsT head) (k : head -> ccs) (q : ccs) a,
      FiniteSchedTree t ->
      (forall hd, k hd ⊢ a →ccs q) ->
      (hd <- t;; k hd) ⊢ a →ccs q.
   Admitted.
 
-  Lemma step_ccs_is_returned_by_get_hd : 
+  Lemma step_ccs_is_returned_by_get_hd :
     forall (p q : ccs) a,
       p ⊢ a →ccs q ->
-      Returns_legacy (headify a q) (get_hd p). 
-  Admitted.     
+      Returns_legacy (headify a q) (get_hd p).
+  Admitted.
 
   Lemma finite_get_hd_FST : forall (p : ccs),
     Finite p ->
@@ -1356,15 +1356,6 @@ Section EquivSem.
         red; red in IHStepOp.
         cbn.
         admit.
-
-(*
-      rename P' into Po.
-        destruct IHStepOp as [Ps [StepSem R]].
-        exists (Ps ∥ Q).
-        split.
-        * Print S_Vis_Sched2_L.
-          admit.
-        * admit. *)
 
     - (* The operational side can simulate the denotational semantics *)
       intros a P' StepSem.
