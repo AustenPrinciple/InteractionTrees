@@ -4,7 +4,7 @@ Open Scope ccs_scope.
 
 Definition use_channel (c : chan) (a : option action) : bool :=
   match a with
-  | Some (↑ c') | Some (↓ c') => c =? c'
+  | Some (↑ c') | Some (↓ c') => (c =? c')%string
   | None => false
   end.
 

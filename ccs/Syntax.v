@@ -33,17 +33,27 @@ Definition op (a : action) : action :=
   | Rcv c => Send c
   end.
 
-Definition action_eq_dec : forall (a b : action), {a = b} + {~ a = b}.
-  repeat decide equality.
-Defined.
+Definition eqb_action : action -> action -> bool :=
+  fun a b => match a,b with
+      | Send c, Send c' 
+      | Rcv c, Rcv c' => String.eqb c c'
+      | _, _ => false
+  end .
+
+Lemma eqb_action_refl : forall a, 
+   eqb_action a a = true.
+Proof.
+  intros []; cbn; auto using eqb_refl.
+Qed.
 
 Definition are_opposite (a b : action) : bool :=
-  if action_eq_dec a (op b) then true else false.
+  if eqb_action a (op b) then true else false.
 
 Module CCSNotations.
 
   Declare Scope ccs_scope.
 
+  Infix "=?" := eqb_action : ccs_scope. 
   Notation "0" := DoneT : ccs_scope.
   Notation "a ⋅ P" := (ActionT a P) (at level 10) : ccs_scope.
   Notation "P ∥ Q" := (ParaT P Q) (at level 29, left associativity) : ccs_scope.

@@ -9,6 +9,7 @@ From CCS Require Import
      PropT
      Syntax
      Utils
+     Operational
 .
 Import ITreeNotations.
 Open Scope itree.
@@ -206,7 +207,7 @@ Section Semantics.
             match a with
             | Send c'
             | Rcv c' =>
-              if c =? c' then dead else trigger e
+              if (c =? c')%string then dead else trigger e
             end.
 
   Definition restrict : chan -> ccs -> ccs :=
@@ -503,9 +504,6 @@ Notation "'schedP' e" := (inl1 e) (at level 10).
 Notation "'actP' e" := (inr1 (inl1 e)) (at level 10).
 Notation "'synchP' e" := (inr1 (inr1 (inl1 e))) (at level 10).
 Notation "'deadP' e" := (inr1 (inr1 (inr1 e))) (at level 10).
-
-From CCS Require Import
-  Operational.
 
 Section EquivSem.
 
@@ -1271,10 +1269,123 @@ Section EquivSem.
     intros []; reflexivity.
   Qed. 
 
-  Lemma action_eq_dec_refl : forall a,
-     exists e, action_eq_dec a a = left e.
+  Lemma SumL_sem :
+    forall P a Q P',
+      P ⊢a→sem P' ->
+      P ⊕ Q ⊢a→sem P'.
+  Proof.
+    intros.
+    apply S_Plus_L with ⟦P⟧ ⟦Q⟧; auto; reflexivity.
+  Qed.
+
+  Lemma SumR_sem :
+    forall P a Q Q',
+      Q ⊢a→sem Q' ->
+      P ⊕ Q ⊢a→sem Q'.
+  Proof.
+    intros.
+    apply S_Plus_R with ⟦P⟧ ⟦Q⟧; auto; reflexivity.
+  Qed.
+
+ Lemma ParL_sem :
+    forall P a Q P',
+      P ⊢a→sem P' ->
+      P ∥ Q ⊢a→sem P' ∥ Q. 
+  Proof.
+    intros * STEP.
+    unfold step_sem in *.
+    cbn.
+    rewrite para_unfold.
+    apply step_ccs_through_FST with (headify a ⟦P'⟧).
+    3:apply step_ccs_through_FST_weak.
+    * apply finite_get_hd_FST, model_finite.
+    * apply step_ccs_get_hd_returns; assumption.
+    * apply finite_get_hd_FST, model_finite.
+    * intros hd.
+      destruct hd eqn:EQHD, a eqn:EQa; cbn;
+        try (constructor; unfold act; rewrite bind_trigger; reflexivity);
+        try (eapply S_Sched2_L; [constructor; unfold act; rewrite bind_trigger; reflexivity | reflexivity | reflexivity]).
+        destruct (are_opposite a1 a0).
+        eapply S_Sched3_L; [constructor; unfold act; rewrite bind_trigger; reflexivity | reflexivity | reflexivity].
+        eapply S_Sched2_L; [constructor; unfold act; rewrite bind_trigger; reflexivity | reflexivity | reflexivity].
+  Qed.
+
+  Lemma ParR_sem :
+    forall P a Q Q',
+      Q ⊢a→sem Q' ->
+      P ∥ Q ⊢a→sem P ∥ Q'. 
+  Proof.
+    intros * STEP.
+    unfold step_sem in *.
+    cbn.
+    rewrite para_unfold.
+    apply step_ccs_through_FST_weak.
+    2:intros; apply step_ccs_through_FST with (headify a ⟦Q'⟧).
+    * apply finite_get_hd_FST, model_finite.
+    * apply finite_get_hd_FST, model_finite.
+    * apply step_ccs_get_hd_returns; assumption.
+    * destruct hd eqn:EQHD, a eqn:EQa; cbn;
+        try (constructor; unfold act; rewrite bind_trigger; reflexivity);
+        try (eapply S_Sched2_R; [constructor; unfold act; rewrite bind_trigger; reflexivity | reflexivity | reflexivity]).
+        destruct (are_opposite a0 a1).
+        eapply S_Sched3_R; [constructor; unfold act; rewrite bind_trigger; reflexivity | reflexivity | reflexivity].
+        eapply S_Sched2_R; [constructor; unfold act; rewrite bind_trigger; reflexivity | reflexivity | reflexivity].
+  Qed.
+
+  Lemma ParS_sem :
+    forall P a Q P' Q',
+      P ⊢Some a→sem P' ->
+      Q ⊢Some (op a)→sem Q' ->
+      P ∥ Q ⊢None→sem P' ∥ Q'. 
+  Proof.
+    intros * STEP_P STEP_Q.
+    unfold step_sem in *.
+    cbn.
+    rewrite para_unfold.
+    apply step_ccs_through_FST with (headify (Some a) ⟦P'⟧).
+    3:apply step_ccs_through_FST with (headify (Some (op a)) ⟦Q'⟧).
+    * apply finite_get_hd_FST, model_finite.
+    * apply step_ccs_get_hd_returns; assumption.
+    * apply finite_get_hd_FST, model_finite.
+    * apply step_ccs_get_hd_returns; assumption.
+    * cbn. 
+      unfold are_opposite.
+      rewrite op_involutive, eqb_action_refl.
+      eapply S_Sched3_S; [constructor;rewrite bind_trigger; reflexivity | reflexivity | reflexivity].
+  Qed.
+
+ Lemma Restrict_sem :
+    forall P a c P',
+      use_channel c a = false ->
+      P ⊢a→sem P' ->
+      P ∖ c ⊢a→sem P' ∖ c.
+  Proof.
   Admitted.
  
+  Theorem model_complete :
+    forall P a Q, 
+      P ⊢a→op Q ->
+      P ⊢a→sem Q.
+  Proof.
+    intros * StepOp.
+    (* Lock-step simulation *)
+    induction StepOp;
+      try now constructor.
+    + apply SumL_sem; assumption. 
+
+    + apply SumR_sem; assumption. 
+      
+    + apply ParL_sem; assumption. 
+
+    + apply ParR_sem; assumption. 
+    
+    + eapply ParS_sem; eassumption. 
+       
+    + (* Restrict *)
+      apply Restrict_sem; assumption.
+
+  Qed.
+
   Theorem model_correct_complete :
     forall P, bisim P P.
   Proof.
@@ -1288,74 +1399,7 @@ Section EquivSem.
       exists P'.
       split; [| right; auto].
       clear CIH r.
-
-      (* Lock-step simulation *)
-      induction StepOp;
-        try now constructor.
-      + (* Plus Left *)
-        red; red in IHStepOp.
-        cbn.
-        now apply S_Plus_L with (model P) (model Q).
-      + (* Plus Right *)
-        red; red in IHStepOp.
-        cbn.
-        now apply S_Plus_R with (model P) (model Q).
-      + (* Para Left-first *)
-        red; red in IHStepOp.
-        clear StepOp.
-        cbn.
-        rewrite para_unfold.
-        apply step_ccs_through_FST with (headify a ⟦P'⟧).
-        3:apply step_ccs_through_FST_weak.
-        * apply finite_get_hd_FST, model_finite.
-        * apply step_ccs_get_hd_returns; assumption.
-        * apply finite_get_hd_FST, model_finite.
-        * intros hd.
-          destruct hd eqn:EQHD, a eqn:EQa; cbn;
-            try (constructor; unfold act; rewrite bind_trigger; reflexivity);
-            try (eapply S_Sched2_L; [constructor; unfold act; rewrite bind_trigger; reflexivity | reflexivity | reflexivity]).
-            destruct (are_opposite a1 a0).
-            eapply S_Sched3_L; [constructor; unfold act; rewrite bind_trigger; reflexivity | reflexivity | reflexivity].
-            eapply S_Sched2_L; [constructor; unfold act; rewrite bind_trigger; reflexivity | reflexivity | reflexivity].
-
-      + (* Para Right-first *)
-        red; red in IHStepOp.
-        clear StepOp.
-        cbn.
-        rewrite para_unfold.
-        apply step_ccs_through_FST_weak.
-        2: intros hd; apply step_ccs_through_FST with (headify a ⟦Q'⟧).
-        * apply finite_get_hd_FST, model_finite.
-        * apply finite_get_hd_FST, model_finite.
-        * apply step_ccs_get_hd_returns; assumption.
-        * destruct hd eqn:EQHD, a eqn:EQa; cbn;
-            try (constructor; unfold act; rewrite bind_trigger; reflexivity);
-            try (eapply S_Sched2_R; [constructor; unfold act; rewrite bind_trigger; reflexivity | reflexivity | reflexivity]).
-            destruct (are_opposite a0 a1).
-            eapply S_Sched3_R; [constructor; unfold act; rewrite bind_trigger; reflexivity | reflexivity | reflexivity].
-            eapply S_Sched2_R; [constructor; unfold act; rewrite bind_trigger; reflexivity | reflexivity | reflexivity].
-      
-      + (* Para Synch *)
-        red; red in IHStepOp1; red in IHStepOp2.
-        clear StepOp1 StepOp2.
-        cbn.
-        rewrite para_unfold.
-        apply step_ccs_through_FST with (headify (Some a) ⟦P'⟧).
-        3:apply step_ccs_through_FST with (headify (Some (op a)) ⟦Q'⟧).
-        * apply finite_get_hd_FST, model_finite.
-        * apply step_ccs_get_hd_returns; assumption.
-        * apply finite_get_hd_FST, model_finite.
-        * apply step_ccs_get_hd_returns; assumption.
-        * cbn. 
-          unfold are_opposite.
-          rewrite op_involutive.
-          destruct (action_eq_dec_refl a) as (_ & ->).
-          eapply S_Sched3_S; [constructor;rewrite bind_trigger; reflexivity | reflexivity | reflexivity].
-          
-      + (* Restrict *)
-        red; red in IHStepOp.
-        cbn.
-        admit.
+      apply model_complete; auto.
 
     - (* The operational side can simulate the denotational semantics *)
       intros a P' StepSem.
