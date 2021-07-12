@@ -1354,14 +1354,51 @@ Section EquivSem.
       eapply S_Sched3_S; [constructor;rewrite bind_trigger; reflexivity | reflexivity | reflexivity].
   Qed.
 
- Lemma Restrict_sem :
+  #[global] Instance restrict_eq_itree c : 
+      Proper (eq_itree eq ==> eq_itree eq) (restrict c).
+  Proof.
+    unfold restrict; do 2 red; intros * EQ; rewrite EQ; reflexivity.
+  Qed.
+
+  Lemma restrict_tau : forall c P,
+    restrict c (Tau P) ≅ Tau (restrict c P).
+  Proof.
+    unfold restrict; intros; rewrite interp_tau; reflexivity.
+  Qed. 
+
+  Lemma restrict_act : forall c P a,
+    use_channel c (Some a) = false ->
+    restrict c (act a;; P) ≈ act a;; restrict c P.
+  Proof.
+    unfold restrict, act; intros * NEQ.
+    rewrite interp_bind, interp_trigger.
+    cbn in *; destruct a; rewrite NEQ; reflexivity.
+  Qed. 
+
+  Lemma Restrict_sem_aux :
+    forall P a c P',
+      use_channel c a = false ->
+      P ⊢a→ccs P' ->
+      restrict c P ⊢a→ccs restrict c P'.
+  Proof.
+    intros * NEQ STEP.
+    induction STEP.
+    - rewrite H, restrict_tau.
+      eapply S_Tau; [| reflexivity]; auto. 
+    - rewrite H.
+      (* Need to work up to eutt *)
+  Admitted.
+     
+  Lemma Restrict_sem :
     forall P a c P',
       use_channel c a = false ->
       P ⊢a→sem P' ->
       P ∖ c ⊢a→sem P' ∖ c.
   Proof.
-  Admitted.
- 
+    intros * NEQ STEP.
+    apply Restrict_sem_aux; auto.
+  Qed.    
+
   Theorem model_complete :
     forall P a Q, 
       P ⊢a→op Q ->
