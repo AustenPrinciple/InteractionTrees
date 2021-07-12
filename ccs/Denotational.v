@@ -6,10 +6,8 @@ From ITree Require Import
      ITreeFacts.
 
 From CCS Require Import
-     PropT
      Syntax
      Utils
-     Operational
 .
 Import ITreeNotations.
 Open Scope itree.
@@ -18,6 +16,19 @@ Open Scope ccs_scope.
 
 From Paco Require Import paco.
 From Coq Require Import Morphisms.
+(* end hide *)
+
+(** * An itree-based semantics for CCS
+  We define in this file a model for CCS based on interaction trees.
+  We take as semantic domain a tree allowing two main kind of interactions:
+  - Scheduling ones, embedding both the internal and parallelism non-determinism 
+    of the language in the trees 
+  - Communication and synchronization events.
+  The model is define compositionally via combinators.
+
+  A notion of stepping is defined on the model as a means to relate
+  this semantics to the traditional operational one.
+  *)
 
 Section Semantics.
 
@@ -44,6 +55,7 @@ Section Semantics.
   Definition done : ccs := Ret tt.
 
   Definition act (a : action) : ccs := trigger (Act a).
+  Definition synch : ccs := trigger Synch.
 
   Definition plus (P Q : ccs) : ccs :=
     b <- trigger Plus;;
@@ -235,80 +247,67 @@ Section Semantics.
   (** A term can advance in a single step producing either an action or a synchronisation,
    *  encoded here as None *)
   Inductive step : ccs -> option action -> ccs -> Prop :=
-  (* Tau *)
-  | S_Tau : forall a P P' Q,
-       step P a Q ->
-       P' ≅ Tau P ->
-       step P' a Q
   (* Simple action *)
   | S_Act : forall a P P',
-       P' ≅ act a ;; P ->
+       P' ≈ act a ;; P ->
        step P' (Some a) P
   (* Synchronisation *)
   | S_Synch : forall P P',
-       P' ≅ trigger Synch ;; P ->
+       P' ≈ synch ;; P ->
        step P' None P
   (* Choice *)
   | S_Plus_L : forall a P L L' R,
       step L a L' ->
-      P ≅ plus L R ->
+      P ≈ plus L R ->
       step P a L'
   | S_Plus_R : forall a P L R R',
       step R a R' ->
-      P ≅ plus L R ->
+      P ≈ plus L R ->
       step P a R'
   (* Two-way parallelism *)
   | S_Sched2_L : forall a P P' L L' R,
       step L a L' ->
-      P ≅ branch2 L R ->
-      P' ≅ L' ->
+      P ≈ branch2 L R ->
       step P a P'
   | S_Sched2_R : forall a P P' L R R',
       step R a R' ->
-      P ≅ branch2 L R ->
-      P' ≅ R' ->
+      P ≈ branch2 L R ->
       step P a P'
   (* Three-way parallelism *)
   | S_Sched3_L : forall a P P' L L' R S,
       step L a L' ->
-      P ≅ branch3 L R S ->
-      P' ≅ L' ->
+      P ≈ branch3 L R S ->
       step P a P'
   | S_Sched3_R : forall a P P' L R R' S,
       step R a R' ->
-      P ≅ branch3 L R S ->
-      P' ≅ R' ->
+      P ≈ branch3 L R S ->
       step P a P'
   | S_Sched3_S : forall a P P' L R S S',
       step S a S' ->
-      P ≅ branch3 L R S ->
-      P' ≅ S' ->
+      P ≈ branch3 L R S ->
       step P a P'.
 
-  Global Instance eq_itree_step :
-    Proper (eq_itree eq ==> eq ==> eq_itree eq ==> flip impl) step.
+  #[global] Instance eutt_step :
+    Proper (eutt eq ==> eq ==> eutt eq ==> flip impl) step.
   Proof.
     do 6 red; intros * EQ1 * -> * EQ2 STEP.
     revert x EQ1 x0 EQ2.
     induction STEP; intros.
-    - apply S_Tau with P.
-      + now apply IHSTEP.
-      + etransitivity; eauto.
     - apply S_Act; rewrite EQ1,H; apply eqit_bind; [reflexivity | intros ?; symmetry; auto].
     - apply S_Synch; rewrite EQ1,H; apply eqit_bind; [reflexivity | intros ?; symmetry; auto].
     - eapply S_Plus_L; [| rewrite EQ1; eauto].
       apply IHSTEP; [reflexivity | auto].
     - eapply S_Plus_R; [| rewrite EQ1; eauto].
       apply IHSTEP; [reflexivity | auto].
-    - eapply S_Sched2_L; [| rewrite EQ1; eauto | rewrite EQ2; eauto].
+    - eapply S_Sched2_L; [| rewrite EQ1; eauto].
       apply IHSTEP; [reflexivity | reflexivity].
-    - eapply S_Sched2_R; [| rewrite EQ1; eauto | rewrite EQ2; eauto].
+    - eapply S_Sched2_R; [| rewrite EQ1; eauto].
       apply IHSTEP; [reflexivity | reflexivity].
-    - eapply S_Sched3_L ; [| rewrite EQ1; eauto | rewrite EQ2; eauto].
+    - eapply S_Sched3_L ; [| rewrite EQ1; eauto].
       apply IHSTEP; [reflexivity | reflexivity].
-    - eapply S_Sched3_R ; [| rewrite EQ1; eauto | rewrite EQ2; eauto].
+    - eapply S_Sched3_R ; [| rewrite EQ1; eauto].
       apply IHSTEP; [reflexivity | reflexivity].
-    - eapply S_Sched3_S ; [| rewrite EQ1; eauto | rewrite EQ2; eauto].
+    - eapply S_Sched3_S ; [| rewrite EQ1; eauto].
       apply IHSTEP; [reflexivity | reflexivity].
   Qed.
 
@@ -457,13 +456,8 @@ Section Semantics.
   Lemma step_tau_inv :
     forall P a Q, step (Tau P) a Q -> step P a Q.
   Proof.
-    intros.
-    inversion H; subst.
-    all: try now apply eqit_inv in H0.
-    all: apply eqit_inv in H1;
-      cbn in H1.
-    now rewrite H1.
-    all: contradiction.
+    intros * STEP.
+    rewrite tau_eutt in STEP; auto.
   Qed.
 
   Lemma example1: bisim_old (act (↓ "a") ;; done)
@@ -473,7 +467,7 @@ Section Semantics.
     split; intros.
     - exists P'.
       split.
-      + now apply S_Tau with (P := (act (↓ "a");; done)).
+      + rewrite tau_eutt; auto.
       + apply bisim_refl.
     - exists Q'.
       split.
@@ -490,7 +484,7 @@ Section Semantics.
     - intros.
       exists P'.
       split; [| left; apply bisim_refl'].
-      now apply S_Tau with (P := (act (↓ "a");; done)).
+      rewrite tau_eutt; auto.
     - intros.
       exists Q'.
       split; [| left; apply bisim_refl'].
@@ -499,949 +493,90 @@ Section Semantics.
 
 End Semantics.
 
-(* Notations for patterns *)
-Notation "'schedP' e" := (inl1 e) (at level 10).
-Notation "'actP' e" := (inr1 (inl1 e)) (at level 10).
-Notation "'synchP' e" := (inr1 (inr1 (inl1 e))) (at level 10).
-Notation "'deadP' e" := (inr1 (inr1 (inr1 e))) (at level 10).
+Module DenNotations.
 
-Section EquivSem.
+  (* Notations for patterns *)
+  Notation "'schedP' e" := (inl1 e) (at level 10).
+  Notation "'actP' e"   := (inr1 (inl1 e)) (at level 10).
+  Notation "'synchP' e" := (inr1 (inr1 (inl1 e))) (at level 10).
+  Notation "'deadP' e"  := (inr1 (inr1 (inr1 e))) (at level 10).
 
   Notation step_ccs := Denotational.step.
-  Notation step_op  := Operational.step.
-
   Notation ccsE   := (NonDetE +' ActionE +' SynchE +' DeadE).
   Notation ccsT T := (itree ccsE T).
   Notation ccs    := (ccsT unit).
 
-  (* Lifting the operational stepping over itrees to the syntax
-  via representation *)
-  Definition step_sem : term -> option action -> term -> Prop :=
-    fun t1 ma t2 => step_ccs (model t1) ma (model t2).
-
-  (* Lock-step bisimulation between terms and [ccs] *)
-  Variant bisimF bisim : term -> term -> Prop :=
-    _bisimF : forall P Q,
-      ((forall a P' (PStep : step_op P a P'),
-           exists Q', step_sem Q a Q' /\ bisim P' Q')
-       /\ (forall a Q' (QStep : step_sem Q a Q'),
-             exists P', step_op P a P' /\ bisim P' Q'))
-      -> bisimF bisim P Q.
-  Hint Constructors bisimF : core.
-
-  Definition bisim := paco2 bisimF bot2.
-  Hint Unfold bisim : core.
-
-  Lemma bisimF_mon : monotone2 bisimF.
-  Proof.
-    unfold monotone2.
-    intros.
-    inversion IN; subst.
-    destruct H as [StepOp StepSem].
-    econstructor.
-    split; intros.
-    - apply StepOp in PStep as [Q' [Sem2 RPQ]].
-      eauto.
-    - apply StepSem in QStep as [P' [Op2 RPQ]].
-      eauto.
-  Qed.
-  Hint Resolve bisimF_mon : paco.
-
-  Definition headify a :=
-    match a with
-    | Some a => HAct a
-    | None => HSynch
-    end.
-
-  Inductive Returns_legacy {E} {A: Type} (a: A) : itree E A -> Prop :=
-  | Returns_legacyRet: forall t, t ≅ Ret a -> Returns_legacy a t
-  | Returns_legacyTau: forall t u, t ≅ Tau u -> Returns_legacy a u -> Returns_legacy a t
-  | Returns_legacyVis: forall {X} (e: E X) (x: X) t k, t ≅ Vis e k -> Returns_legacy a (k x) -> Returns_legacy a t.
-
-  Inductive Returns {A: Type} (a: A) : ccsT A -> Prop :=
-  | ReturnsRet: forall t, t ≅ Ret a -> Returns a t
-  | ReturnsTau: forall t u, t ≅ Tau u -> Returns a u -> Returns a t
-  | ReturnsChoiceL: forall (t P Q: ccsT A),
-      t ≅ Vis (inl1 Plus) (fun b: bool => if b then P else Q) ->
-      Returns a P -> Returns a t
-  | ReturnsChoiceR: forall t P Q,
-      t ≅ Vis (inl1 Plus) (fun b: bool => if b then P else Q) ->
-      Returns a Q -> Returns a t
-  | ReturnsPara2L: forall t P Q,
-      t ≅ Vis (inl1 Sched2) (fun b: bool => if b then P else Q) ->
-      Returns a P -> Returns a t
-  | ReturnsPara2R: forall t P Q,
-      t ≅ Vis (inl1 Sched2) (fun b: bool => if b then P else Q) ->
-      Returns a Q -> Returns a t
-  | ReturnsPara3L: forall t P Q R,
-      t ≅ Vis (inl1 Sched3) (fun c => match c with
-                                   | Left => P
-                                   | Right => Q
-                                   | Synchronize => R
-                                   end) ->
-      Returns a P -> Returns a t
-  | ReturnsPara3R: forall t P Q R,
-      t ≅ Vis (inl1 Sched3) (fun c => match c with
-                                   | Left => P
-                                   | Right => Q
-                                   | Synchronize => R
-                                   end) ->
-      Returns a Q -> Returns a t
-  | ReturnsPara3S: forall t P Q R,
-      t ≅ Vis (inl1 Sched3) (fun c => match c with
-                                   | Left => P
-                                   | Right => Q
-                                   | Synchronize => R
-                                   end) ->
-      Returns a R -> Returns a t.
-
-  Section Inversion_Lemma.
-
-    (* TODO: Push some stuff in the itree library *)
-
-    Context {E : Type -> Type} {R1 R2 : Type} (RR : R1 -> R2 -> Prop).
-
-    Lemma eqitree_inv_Tau_r (t : itree E R1) t' :
-      eq_itree RR t (Tau t') -> exists t0, observe t = TauF t0 /\ eq_itree RR t0 t'.
-    Proof.
-      intros.
-      punfold H.
-      inv H;
-        try inv CHECK;
-        pclearbot;
-        eauto.
-    Qed.
-
-    Lemma eqitree_inv_Tau_l (t : itree E R1) t' :
-      eq_itree RR (Tau t) t' -> exists t0, observe t' = TauF t0 /\ eq_itree RR t t0.
-    Proof.
-      intros; punfold H; inv H; try inv CHECK; pclearbot; eauto.
-    Qed.
-
-    Lemma eqitree_inv_Ret_r (t : itree E R1) r :
-      eq_itree RR t (Ret r) -> exists r', RR r' r /\ observe t = RetF r'.
-    Proof.
-      intros; punfold H; inv H; try inv CHECK; eauto.
-    Qed.
-
-    Lemma eqitree_inv_Ret_l (t : itree E R2) r :
-      eq_itree RR (Ret r) t -> exists r', RR r r' /\ observe t = RetF r'.
-    Proof.
-      intros; punfold H; inv H; try inv CHECK; eauto.
-    Qed.
-
-    Lemma eqitF_inv_VisF_l {b1 b2 vclo sim}
-      X1 (e1 : E X1) (k1 : X1 -> _) t2 :
-       eqitF RR b1 b2 vclo sim (VisF e1 k1) t2 ->
-       (exists k2, t2 = VisF e1 k2 /\ forall v, vclo sim (k1 v) (k2 v)) \/
-       (b2 = true /\ exists t2', t2 = TauF t2' /\ eqitF RR b1 b2 vclo sim  (VisF e1 k1) (observe t2')).
-    Proof.
-      refine (fun H =>
-        match H in eqitF _ _ _ _ _ t1 _ return
-        match t1 return Prop with
-        | VisF e1 k1 => _
-        | _ => True
-        end
-      with
-      | EqVis _ _ _ _ _ _ _ _ _ => _
-      | _ => _
-      end); try exact I.
-      - left; eauto.
-      - destruct i; eauto.
-    Qed.
-
-    Lemma eqitree_inv_Vis_r {U} (t : itree E R1) (e : E U) (k : U -> itree E R2) :
-      eq_itree RR t (Vis e k) -> exists k', observe t = VisF e k' /\ forall u, eq_itree RR (k' u) (k u).
-    Proof.
-      intros.
-      punfold H.
-      apply eqitF_inv_VisF_r in H.
-      destruct H as [ [? [-> ?]] | [] ]; [ | discriminate ].
-      pclearbot.
-      eexists; split; eauto.
-    Qed.
-
-    Lemma eqitree_inv_Vis_l {U} (t : itree E R2) (e : E U) (k : U -> _) :
-      eq_itree RR (Vis e k) t -> exists k', observe t = VisF e k' /\ forall u, eq_itree RR (k u) (k' u).
-    Proof.
-      intros; punfold H; apply eqitF_inv_VisF_l in H.
-      destruct H as [ [? [-> ?]] | [] ]; [ | discriminate ].
-      pclearbot. eexists; split; eauto.
-    Qed.
-
-    Lemma eqitree_tau_ret_abs : forall (t : itree E R1) x,
-      eq_itree RR (Tau t) (Ret x) -> False.
-    Proof.
-      intros; edestruct @eqitree_inv_Tau_l as (? & abs &?); eauto; inv abs.
-    Qed.
-
-    Lemma eqitree_ret_tau_abs : forall (t : itree E R2) x,
-      eq_itree RR (Ret x) (Tau t) -> False.
-    Proof.
-     intros; edestruct @eqitree_inv_Tau_r as (? & abs &?); eauto; inv abs.
-    Qed.
-
-    Lemma eqitree_ret_vis_abs : forall {U} e (k : U -> itree E R2) x,
-      eq_itree RR (Ret x) (Vis e k) -> False.
-    Proof.
-     intros; edestruct @eqitree_inv_Vis_r as (? & abs &?); eauto; inv abs.
-    Qed.
-
-    Lemma eqitree_vis_ret_abs : forall {U} e (k : U -> itree E R1) x,
-      eq_itree RR (Vis e k) (Ret x) -> False.
-    Proof.
-      intros; edestruct @eqitree_inv_Vis_l as (? & abs &?); eauto; inv abs.
-    Qed.
-
-    Lemma eqitree_vis_tau_abs : forall {U} e (k : U -> itree E R1) t,
-      eq_itree RR (Vis e k) (Tau t) -> False.
-    Proof.
-      intros; edestruct @eqitree_inv_Vis_l as (? & abs &?); eauto; inv abs.
-    Qed.
-
-    Lemma eqitree_tau_vis_abs : forall {U} e (k : U -> itree E R2) t,
-      eq_itree RR (Tau t) (Vis e k) -> False.
-    Proof.
-      intros; edestruct @eqitree_inv_Vis_r as (? & abs &?); eauto; inv abs.
-    Qed.
-
-  End Inversion_Lemma.
-
-  Ltac inv_eqitree H :=
-    match type of H with
-    | eq_itree _ (Tau _) (Ret _)   => apply eqitree_tau_ret_abs in H; contradiction
-    | eq_itree _ (Ret _) (Tau _)   => apply eqitree_ret_tau_abs in H; contradiction
-    | eq_itree _ (Vis _ _) (Ret _) => apply eqitree_vis_ret_abs in H; contradiction
-    | eq_itree _ (Ret _) (Vis _ _) => apply eqitree_ret_vis_abs in H; contradiction
-    | eq_itree _ (Vis _ _) (Tau _) => apply eqitree_vis_tau_abs in H; contradiction
-    | eq_itree _ (Tau _) (Vis _ _) => apply eqitree_tau_vis_abs in H; contradiction
-    | eq_itree _ (Ret _) (Ret _)   => apply eqit_inv_Ret in H
-    | _ => idtac
-    end.
-
-  From Coq Require Import Morphisms.
-
-  Notation get_hd_ P :=
-    match observe P with
-    | RetF x => Ret HDone
-    | TauF P => Tau (get_hd P)
-    | @VisF _ _ _ T e k =>
-      match e with
-      | schedP e => vis e (fun x => get_hd (k x))
-      | actP e =>
-        match e in ActionE X return (T = X -> ccsT head) with
-        | Act a => fun (Pf : T = unit) =>
-                    Ret (HAct a (@eq_rect_r _ T (fun T => T -> itree ccsE unit) k unit (eq_sym Pf) tt))
-        end eq_refl
-      | synchP e =>
-        match e in SynchE X return (T = X -> ccsT head) with
-        | Synch => fun (Pf : T = unit) =>
-                    Ret (HSynch (@eq_rect_r _ T (fun T => T -> itree ccsE unit) k unit (eq_sym Pf) tt))
-        end eq_refl
-      | deadP e => Ret HDone
-      end
-    end
-  .
-
-  Lemma get_hd_unfold : forall P,
-      get_hd P ≅ get_hd_ P.
-  Proof.
-    intros.
-    apply observing_sub_eqit.
-    constructor.
-    reflexivity.
-  Qed.
-
-  Definition eq_head R : head -> head -> Prop :=
-    fun h1 h2 =>
-      match h1,h2 with
-      | HDone, HDone => True
-      | HSynch t1, HSynch t2 => eq_itree R t1 t2
-      | HAct a1 t1, HAct a2 t2 => a1 = a2 /\ eq_itree R t1 t2
-      | _, _ => False
-      end.
-  Hint Unfold eq_head : core.
-
-  Global Instance get_hd_eq_itree {R} :
-    Proper (eq_itree R ==> eq_itree (eq_head R)) get_hd.
-  Proof.
-    do 2 red.
-    ginit.
-    gcofix CIH.
-    intros * EQ.
-    punfold EQ.
-    setoid_rewrite get_hd_unfold.
-    induction EQ; try inv CHECK.
-    - gstep; constructor; reflexivity.
-    - gstep; pclearbot. constructor; auto with paco.
-    - gstep; pclearbot.
-      destruct e as [? | [? | [? | ?]]].
-      + constructor; red; auto with paco.
-      + destruct a; constructor; auto.
-      + destruct s; constructor; auto.
-      + constructor; auto.
-  Qed.
-
-  Inductive Finite {E X} : itree E X -> Prop :=
-  | FRet : forall R t (x: X), eq_itree R t (Ret x) -> Finite t
-  | FTau : forall R t P, eq_itree R t (Tau P) -> Finite P -> Finite t
-  | FVis {A} : forall R t (e: E A) k,
-      eq_itree R t (Vis e k) -> (forall x, Finite (k x)) -> Finite t.
-
-  Inductive FiniteSchedTree {X} : itree ccsE X -> Prop :=
-  | FSTRet : forall R t (x: X), eq_itree R t (Ret x) -> FiniteSchedTree t
-  | FSTTau : forall R t P, eq_itree R t (Tau P) -> FiniteSchedTree P -> FiniteSchedTree t
-  | FSTPlus : forall R t k,
-      eq_itree R t (b <- trigger Plus;; k b) ->
-      (forall b, FiniteSchedTree (k b)) ->
-      FiniteSchedTree t
-  | FSTSched2 : forall R t k,
-      eq_itree R t (b <- trigger Sched2;; k b) ->
-      (forall b, FiniteSchedTree (k b)) ->
-      FiniteSchedTree t
-  | FSTSched3 : forall R t k,
-      eq_itree R t (c <- trigger Sched3;; k c) ->
-      (forall c, FiniteSchedTree (k c)) ->
-      FiniteSchedTree t.
-
-  Lemma FST_means_Finite {X}: forall (P: itree ccsE X), FiniteSchedTree P -> Finite P.
-  Proof.
-    intros.
-    induction H.
-    - now apply FRet with R x.
-    - now apply FTau with R P.
-    - rewrite bind_trigger in H.
-      eapply FVis;
-        eauto.
-    - rewrite bind_trigger in H.
-      eapply FVis;
-        eauto.
-    - rewrite bind_trigger in H.
-      eapply FVis;
-        eauto.
-  Qed.
-
-  Global Instance Finite_eq_itree {E X} R :
-    Proper (eq_itree R ==> flip impl) (@Finite E X).
-  Proof.
-    do 4 red.
-    intros x y Cong Fin.
-    revert x Cong.
-    induction Fin;
-      intros.
-    - apply FRet with (rcompose R R0) x.
-      eapply eqit_trans;
-        eauto.
-    - apply eqitree_inv_Tau_r in H.
-      destruct H as [t' [Obs Cong']].
-      apply FTau with (rcompose R R0) P.
-      + eapply eqit_trans.
-        * apply Cong.
-        * rewrite itree_eta, Obs.
-          apply eqit_Tau.
-          apply Cong'.
-      + assumption.
-    - apply eqitree_inv_Vis_r in H.
-      destruct H as [t' [Obs Cong']].
-      eapply FVis.
-      + eapply eqit_trans.
-        * eauto.
-        * rewrite itree_eta, Obs.
-          apply eqit_Vis.
-          apply Cong'.
-      + assumption.
-  Qed.
-
-  Global Instance FST_eq_itree {X} R :
-    Proper (eq_itree R ==> flip impl) (@FiniteSchedTree X).
-  Proof.
-    do 4 red.
-    intros x y Cong Fin.
-    revert x Cong.
-    induction Fin;
-      intros.
-    - apply FSTRet with (rcompose R R0) x.
-      eapply eqit_trans;
-        eauto.
-    - apply eqitree_inv_Tau_r in H.
-      destruct H as [t' [Obs Cong']].
-      apply FSTTau with (rcompose R R0) P.
-      + eapply eqit_trans.
-        * eauto.
-        * rewrite itree_eta, Obs.
-          apply eqit_Tau.
-          apply Cong'.
-      + assumption.
-    - apply FSTPlus with (rcompose R R0) k.
-      + eapply eqit_trans;
-          eauto.
-      + assumption.
-    - apply FSTSched2 with (rcompose R R0) k.
-      + eapply eqit_trans;
-          eauto.
-      + assumption.
-    - apply FSTSched3 with (rcompose R R0) k.
-      + eapply eqit_trans;
-          eauto.
-      + assumption.
-  Qed.
-
-  Ltac break_match_goal :=
-    match goal with
-    | [ |- context [ match ?X with _ => _ end ] ] =>
-      match type of X with
-      | sumbool _ _ => destruct X
-      | _ => destruct X eqn:?
-      end
-    end.
-
-  Theorem finite_head : forall P, Finite P -> FiniteSchedTree (get_hd P).
-  Proof.
-    intros.
-    induction H.
-    - (* Ret *)
-      pose proof (get_hd_unfold (Ret x)) as Eq;
-        cbn in Eq.
-      apply FSTRet with (eq_head R) HDone.
-      apply get_hd_eq_itree in H.
-      now rewrite Eq in H.
-    - (* Tau *)
-      pose proof (get_hd_unfold (Tau P)) as Eq;
-        cbn in Eq.
-      rewrite H, Eq.
-      now apply FSTTau with eq (get_hd P).
-    - (* Vis *)
-      rewrite H.
-      rewrite get_hd_unfold; cbn.
-      break_match_goal.
-      + (* Vis NonDetE, special case *)
-        induction n;
-          [ apply FSTPlus with eq (fun x => get_hd (k x))
-          | apply FSTSched2 with eq (fun x => get_hd (k x))
-          | apply FSTSched3 with eq (fun x => get_hd (k x))];
-          (now rewrite bind_trigger || assumption).
-      + (* Vis anything else *)
-        repeat break_match_goal;
-          now eapply FSTRet.
-  Qed.
-
-  Notation para_ P Q :=
-    (rP <- get_hd P;;
-    rQ <- get_hd Q;;
-    match rP, rQ with
-    | HDone, HDone => done
-    | HDone, HAct b Q' => vis (Act b) (fun _ => para P Q')
-    | HDone, HSynch Q' => vis Synch   (fun _ => para P Q')
-    | HAct a P', HDone => vis (Act a) (fun _ => para P' Q)
-    | HSynch P', HDone => vis Synch   (fun _ => para P' Q)
-    | HAct a P', HAct b Q' =>
-      if are_opposite a b
-      then
-        branch3 (vis (Act a) (fun _ => para P' Q))
-                (vis (Act b) (fun _ => para P Q'))
-                (vis Synch   (fun _ => para P' Q'))
-      else
-        branch2 (vis (Act a) (fun _ => para P' Q))
-                (vis (Act b) (fun _ => para P Q'))
-    | HAct a P', HSynch Q' =>
-      branch2 (vis (Act a) (fun _ => para P' Q))
-              (vis Synch   (fun _ => para P Q'))
-    | HSynch P', HAct a Q' =>
-      branch2 (vis Synch   (fun _ => para P' Q))
-              (vis (Act a) (fun _ => para P Q'))
-    | HSynch P', HSynch Q' =>
-      branch2 (vis Synch   (fun _ => para P' Q))
-              (vis Synch   (fun _ => para P Q'))
-    end)%itree.
-
-  Lemma para_unfold : forall P Q, para P Q ≅ para_ P Q.
-  Proof.
-    intros.
-    apply observing_sub_eqit.
-    constructor.
-    reflexivity.
-  Qed.
-
-  Lemma finite_bind {E X Y} : forall (t: itree E Y) (k: Y -> itree E X),
-      Finite t -> (forall y, Finite (k y)) -> Finite (y <- t;; k y).
-  Proof.
-    intros t k Fin.
-    induction Fin;
-      intros FinK.
-    - apply eqitree_inv_Ret_r in H as [r' [_ Eq]].
-      now rewrite unfold_bind, Eq.
-    - apply eqitree_inv_Tau_r in H as [t' [Eq Rel]].
-      rewrite unfold_bind, Eq.
-      eapply FTau.
-      + reflexivity.
-      + apply IHFin in FinK.
-        admit.
-    - apply eqitree_inv_Vis_r in H as [k' [Eq Rel]].
-      rewrite unfold_bind, Eq.
-      eapply FVis.
-      + reflexivity.
-      + cbn.
-        intros.
-        apply H1 with x in FinK.
-        admit.
-  Admitted.
-
-  Lemma finite_interp {E F X} : forall (h : Handler E F) (t : itree E X),
-      Finite t ->
-      (forall Y (e : E Y), Finite (h _ e)) ->
-      Finite (interp h t).
-  Proof.
-    intros h t FinT.
-    revert h.
-    induction FinT;
-      intros.
-    - apply eqitree_inv_Ret_r in H as [r' [_ Eq]].
-      rewrite unfold_interp;
-        unfold _interp;
-        rewrite Eq.
-      now apply FRet with eq r'.
-    - apply eqitree_inv_Tau_r in H as [t' [Eq Rel]].
-      rewrite unfold_interp;
-        unfold _interp;
-        rewrite Eq.
-      apply FTau with eq (interp h t').
-      + reflexivity.
-      + apply IHFinT in H0.
-        admit.
-    - apply eqitree_inv_Vis_r in H as [k' [Eq Rel]].
-      rewrite unfold_interp;
-        unfold _interp;
-        rewrite Eq.
-      apply finite_bind.
-      + apply H2.
-      + intro.
-        apply FTau with eq (interp h (k' y)).
-        * reflexivity.
-        * apply H1 with (x := y) in H2.
-          admit.
-  Admitted.
-
-(* In order to prove that : [forall P, finite (model P)],
-    we need to reason about the co-recursive call performed by para.
-    However, this call does not take place on immediately structurally smaller
-    arguments, whether on the syntactic level via model nor on the trees themselves.
-    One sensible first step is to introduce an intermediate result on [para]:
-    [forall t s, Finite t -> Finite s -> Finite (para t s)]
-    As mentionned above however, this is still not the panacea: [Finite] essentially
-    gives structural induction on your tree, but the call is still not structural.
-    Hence we probably need to introduce the size of finite trees and proceed by
-    strong induction on the sum of the sizes of both trees, which requires quite
-    a bit of boilerplate and work.
-*)
-
-  Theorem finite_model : forall P, Finite (model P).
-  Proof.
-    induction P;
-      cbn.
-    - (* 0 *)
-      unfold done.
-      now apply FRet with eq tt.
-    - (* a ⋅ P *)
-      unfold act.
-      rewrite bind_trigger.
-      now eapply FVis.
-    - (* para *)
-      rewrite para_unfold.
-      apply finite_bind.
-      + apply FST_means_Finite.
-        now apply finite_head.
-      + intro rP.
-        apply finite_bind.
-        * apply FST_means_Finite.
-          now apply finite_head.
-        * intro rQ.
-          destruct rP, rQ;
-            try assumption.
-          -- now apply FRet with eq tt. 
-          -- admit.
-          -- admit.
-          -- admit.
-          -- unfold branch2.
-             rewrite bind_trigger.
-             eapply FVis.
-             ++ reflexivity.
-             ++ intro.
-                cbn.
-                case_eq x; intro; subst.
-                ** eapply FVis.
-                   --- reflexivity.
-                   --- intros []; cbn.
-                       admit.
-                ** eapply FVis.
-                   --- reflexivity.
-                   --- intro; cbn.
-                       admit.
-          -- admit.
-          -- admit.
-          -- admit.
-          -- admit.
-    - (* plus *)
-      unfold plus.
-      rewrite bind_trigger.
-      eapply FVis.
-      + reflexivity.
-      + intro b.
-        case_eq b;
-          auto.
-    - (* restrict *)
-      apply finite_interp.
-      + assumption.
-      + admit.
-  Admitted.
-
-  Lemma get_hd_FST : forall P, FiniteSchedTree (get_hd (model P)).
-  Proof.
-    intros; eapply finite_head, finite_model.
-  Qed.
-
-  Lemma FST_prefix_can_step {X} : forall (t : ccsT X) (k : X -> ccs) a t',
-      FiniteSchedTree t ->
-      (forall x, step_ccs (k x) a t') ->
-      step_ccs (x <- t;; k x) a t'.
-  Proof.
-    intros.
-    induction H.
-    - apply eqitree_inv_Ret_r in H as [r' [_ Eq]].
-      now rewrite unfold_bind, Eq.
-    - apply eqitree_inv_Tau_r in H as [t0 [Eq Rel]].
-      rewrite unfold_bind, Eq.
-      apply S_Tau with (x <- t0;; k x).
-      +
-  Admitted.
-
-  Theorem step_ccs_get_hd_returns : forall P a P',
-      step_ccs P a P'
-      ->
-      Returns_legacy (headify a P') (get_hd P).
-  Proof.
-    intros.
-    induction H.
-    - pose proof (get_hd_unfold (Tau P)) as Eq;
-        cbn in Eq.
-      (* rewrite <- H0 in Eq. *)
-  Admitted.
-
-  Theorem get_hd_means_step_deprecated : forall P a P',
-      Returns_legacy (headify a P') (get_hd P)
-      <->
-      step_ccs P a P'.
-  Proof.
-    split; intros.
-    - (* Returns -> step :
-       * if a finite path exists in the [get_hd] tree, it
-       * can be used as a proof tree to justify a [step_ccs] *)
-      remember (headify a P') as aP'.
-      remember (get_hd P) as head_P.
-      revert P Heqhead_P.
-      (* By induction on the path in the tree *)
-      induction H.
-      + (* [get_hd P] is a [Ret x], we derive information on the shape of P *)
-        intros; subst.
-        pose proof (itree_eta P) as EQ.
-        rewrite EQ.
-        apply get_hd_eq_itree in EQ.
-        rewrite H in EQ; clear H.
-        destruct (observe P).
-        * (* Can't be a Ret *)
-          rewrite get_hd_unfold in EQ; cbn in EQ.
-          inv_eqitree EQ.
-          destruct a; cbn in EQ; contradiction.
-        * (* Can't be a Tau *)
-          rewrite get_hd_unfold in EQ; cbn in EQ.
-          inv_eqitree EQ.
-        * rewrite get_hd_unfold in EQ; cbn in EQ.
-          destruct e; cbn; inv_eqitree EQ.
-          destruct s; cbn.
-          destruct a0; cbn; inv_eqitree EQ.
-          destruct a; cbn in EQ; try contradiction.
-          destruct EQ as [<- EQ].
-          constructor.
-          unfold act; rewrite bind_trigger; apply eqit_Vis; intros [].
-          symmetry; auto.
-          destruct s; cbn; inv_eqitree EQ.
-          destruct s; cbn; inv_eqitree EQ.
-          destruct a; cbn in EQ; try contradiction.
-          constructor.
-          rewrite bind_trigger; apply eqit_Vis; intros [].
-          symmetry; auto.
-          destruct a; cbn in EQ; contradiction.
-      + (* [get_hd] starts with a [Tau] *)
-        intros; subst.
-        pose proof (itree_eta P) as EQ.
-        rewrite EQ.
-        apply get_hd_eq_itree in EQ.
-        rewrite H in EQ; clear H.
-        destruct (observe P);
-          rewrite get_hd_unfold in EQ;
-          cbn in EQ;
-          inv_eqitree EQ.
-        * admit.
-        * destruct e; cbn in *; inv_eqitree EQ.
-          destruct s; cbn in *; inv_eqitree EQ.
-          destruct a0; cbn in *; inv_eqitree EQ.
-          destruct s; cbn in *; inv_eqitree EQ.
-          destruct s; cbn in *; inv_eqitree EQ.
-      (*
-        eapply S_Tau; [apply IHReturns_legacy |].
-        admit.
-        admit. *)
-      + intros; subst.
-        pose proof (itree_eta P) as EQ; rewrite EQ; apply get_hd_eq_itree in EQ.
-        rewrite H in EQ; clear H.
-        destruct (observe P); rewrite get_hd_unfold in EQ; cbn in EQ; inv_eqitree EQ.
-        destruct e0; cbn in *; inv_eqitree EQ.
-        * admit.
-        * destruct s; cbn in *; inv_eqitree EQ.
-          destruct a0; cbn in *; inv_eqitree EQ.
-          destruct s; cbn in *; inv_eqitree EQ.
-          destruct s; cbn in *; inv_eqitree EQ.
-   - (* Step -> Returns *)
-      induction H.
-      + admit.
-      + admit.
-  Admitted.
-
-  Theorem get_hd_always_returns : forall P, exists a k, Returns (headify a k) (get_hd (model P)).
-  Proof.
-    induction P.
-    - simpl.
-  Admitted.
-
-    (* écrire :
-      prédicat finite
-      pour tout P, finite model P
-      finite P -> finite (get_hd P)
-
-     écrire (et prouver)
-      pour tout P, exists a k, Returns++ (a,k) (get_hd (model P))
-
-     réfléchir à comment écrire
-      ????
-      Returns++ (a,k) P -> step (c a) b Q -> step (P ;; c) b q
-      "si la deuxième moitié du para passe (wrt. step), la première devrait passer aussi parce que les get_hds sont finis"
-      ????
-     *)
-
-  Set Nested Proofs Allowed.
-
   Notation "⟦ P ⟧" := (model P).
   Notation "P '⊢' a '→ccs' Q" := (step_ccs P a Q) (at level 50).
-  Notation "P '⊢' a '→sem' Q" := (step_sem P a Q) (at level 50).
-  Notation "P '⊢' a '→op'  Q" := (step_op P a Q)  (at level 50).
+ 
+End DenNotations.
 
-  Lemma step_ccs_through_FST :
-    forall (t : ccsT head) (k : head -> ccs) (q : ccs) a hd,
-     FiniteSchedTree t ->
-     Returns_legacy hd t ->
-     k hd ⊢ a →ccs q ->
-     (hd <- t;; k hd) ⊢ a →ccs q.
-  Admitted.
+Import DenNotations.
 
-  Lemma step_ccs_through_FST_weak :
-    forall (t : ccsT head) (k : head -> ccs) (q : ccs) a,
-     FiniteSchedTree t ->
-     (forall hd, k hd ⊢ a →ccs q) ->
-     (hd <- t;; k hd) ⊢ a →ccs q.
-  Admitted.
+Notation get_hd_ P :=
+  match observe P with
+  | RetF x => Ret HDone
+  | TauF P => Tau (get_hd P)
+  | @VisF _ _ _ T e k =>
+    match e with
+    | schedP e => vis e (fun x => get_hd (k x))
+    | actP e =>
+      match e in ActionE X return (T = X -> ccsT head) with
+      | Act a => fun (Pf : T = unit) =>
+                  Ret (HAct a (@eq_rect_r _ T (fun T => T -> itree ccsE unit) k unit (eq_sym Pf) tt))
+      end eq_refl
+    | synchP e =>
+      match e in SynchE X return (T = X -> ccsT head) with
+      | Synch => fun (Pf : T = unit) =>
+                  Ret (HSynch (@eq_rect_r _ T (fun T => T -> itree ccsE unit) k unit (eq_sym Pf) tt))
+      end eq_refl
+    | deadP e => Ret HDone
+    end
+  end
+.
 
-  Lemma step_ccs_is_returned_by_get_hd :
-    forall (p q : ccs) a,
-      p ⊢ a →ccs q ->
-      Returns_legacy (headify a q) (get_hd p).
-  Admitted.
+Lemma get_hd_unfold : forall P,
+    get_hd P ≅ get_hd_ P.
+Proof.
+  intros.
+  apply observing_sub_eqit.
+  constructor.
+  reflexivity.
+Qed.
 
-  Lemma finite_get_hd_FST : forall (p : ccs),
-    Finite p ->
-    FiniteSchedTree (get_hd p).
-  Admitted.
+Notation para_ P Q :=
+  (rP <- get_hd P;;
+  rQ <- get_hd Q;;
+  match rP, rQ with
+  | HDone, HDone => done
+  | HDone, HAct b Q' => vis (Act b) (fun _ => para P Q')
+  | HDone, HSynch Q' => vis Synch   (fun _ => para P Q')
+  | HAct a P', HDone => vis (Act a) (fun _ => para P' Q)
+  | HSynch P', HDone => vis Synch   (fun _ => para P' Q)
+  | HAct a P', HAct b Q' =>
+    if are_opposite a b
+    then
+      branch3 (vis (Act a) (fun _ => para P' Q))
+              (vis (Act b) (fun _ => para P Q'))
+              (vis Synch   (fun _ => para P' Q'))
+    else
+      branch2 (vis (Act a) (fun _ => para P' Q))
+              (vis (Act b) (fun _ => para P Q'))
+  | HAct a P', HSynch Q' =>
+    branch2 (vis (Act a) (fun _ => para P' Q))
+            (vis Synch   (fun _ => para P Q'))
+  | HSynch P', HAct a Q' =>
+    branch2 (vis Synch   (fun _ => para P' Q))
+            (vis (Act a) (fun _ => para P Q'))
+  | HSynch P', HSynch Q' =>
+    branch2 (vis Synch   (fun _ => para P' Q))
+            (vis Synch   (fun _ => para P Q'))
+  end)%itree.
 
-  Lemma model_finite : forall (P : term),
-    Finite ⟦P⟧.
-  Admitted.
-
-  Lemma op_involutive : forall a, op (op a) = a.
-  Proof.
-    intros []; reflexivity.
-  Qed. 
-
-  Lemma SumL_sem :
-    forall P a Q P',
-      P ⊢a→sem P' ->
-      P ⊕ Q ⊢a→sem P'.
-  Proof.
-    intros.
-    apply S_Plus_L with ⟦P⟧ ⟦Q⟧; auto; reflexivity.
-  Qed.
-
-  Lemma SumR_sem :
-    forall P a Q Q',
-      Q ⊢a→sem Q' ->
-      P ⊕ Q ⊢a→sem Q'.
-  Proof.
-    intros.
-    apply S_Plus_R with ⟦P⟧ ⟦Q⟧; auto; reflexivity.
-  Qed.
-
- Lemma ParL_sem :
-    forall P a Q P',
-      P ⊢a→sem P' ->
-      P ∥ Q ⊢a→sem P' ∥ Q. 
-  Proof.
-    intros * STEP.
-    unfold step_sem in *.
-    cbn.
-    rewrite para_unfold.
-    apply step_ccs_through_FST with (headify a ⟦P'⟧).
-    3:apply step_ccs_through_FST_weak.
-    * apply finite_get_hd_FST, model_finite.
-    * apply step_ccs_get_hd_returns; assumption.
-    * apply finite_get_hd_FST, model_finite.
-    * intros hd.
-      destruct hd eqn:EQHD, a eqn:EQa; cbn;
-        try (constructor; unfold act; rewrite bind_trigger; reflexivity);
-        try (eapply S_Sched2_L; [constructor; unfold act; rewrite bind_trigger; reflexivity | reflexivity | reflexivity]).
-        destruct (are_opposite a1 a0).
-        eapply S_Sched3_L; [constructor; unfold act; rewrite bind_trigger; reflexivity | reflexivity | reflexivity].
-        eapply S_Sched2_L; [constructor; unfold act; rewrite bind_trigger; reflexivity | reflexivity | reflexivity].
-  Qed.
-
-  Lemma ParR_sem :
-    forall P a Q Q',
-      Q ⊢a→sem Q' ->
-      P ∥ Q ⊢a→sem P ∥ Q'. 
-  Proof.
-    intros * STEP.
-    unfold step_sem in *.
-    cbn.
-    rewrite para_unfold.
-    apply step_ccs_through_FST_weak.
-    2:intros; apply step_ccs_through_FST with (headify a ⟦Q'⟧).
-    * apply finite_get_hd_FST, model_finite.
-    * apply finite_get_hd_FST, model_finite.
-    * apply step_ccs_get_hd_returns; assumption.
-    * destruct hd eqn:EQHD, a eqn:EQa; cbn;
-        try (constructor; unfold act; rewrite bind_trigger; reflexivity);
-        try (eapply S_Sched2_R; [constructor; unfold act; rewrite bind_trigger; reflexivity | reflexivity | reflexivity]).
-        destruct (are_opposite a0 a1).
-        eapply S_Sched3_R; [constructor; unfold act; rewrite bind_trigger; reflexivity | reflexivity | reflexivity].
-        eapply S_Sched2_R; [constructor; unfold act; rewrite bind_trigger; reflexivity | reflexivity | reflexivity].
-  Qed.
-
-  Lemma ParS_sem :
-    forall P a Q P' Q',
-      P ⊢Some a→sem P' ->
-      Q ⊢Some (op a)→sem Q' ->
-      P ∥ Q ⊢None→sem P' ∥ Q'. 
-  Proof.
-    intros * STEP_P STEP_Q.
-    unfold step_sem in *.
-    cbn.
-    rewrite para_unfold.
-    apply step_ccs_through_FST with (headify (Some a) ⟦P'⟧).
-    3:apply step_ccs_through_FST with (headify (Some (op a)) ⟦Q'⟧).
-    * apply finite_get_hd_FST, model_finite.
-    * apply step_ccs_get_hd_returns; assumption.
-    * apply finite_get_hd_FST, model_finite.
-    * apply step_ccs_get_hd_returns; assumption.
-    * cbn. 
-      unfold are_opposite.
-      rewrite op_involutive, eqb_action_refl.
-      eapply S_Sched3_S; [constructor;rewrite bind_trigger; reflexivity | reflexivity | reflexivity].
-  Qed.
-
-  #[global] Instance restrict_eq_itree c : 
-      Proper (eq_itree eq ==> eq_itree eq) (restrict c).
-  Proof.
-    unfold restrict; do 2 red; intros * EQ; rewrite EQ; reflexivity.
-  Qed.
-
-  Lemma restrict_tau : forall c P,
-    restrict c (Tau P) ≅ Tau (restrict c P).
-  Proof.
-    unfold restrict; intros; rewrite interp_tau; reflexivity.
-  Qed. 
-
-  Lemma restrict_act : forall c P a,
-    use_channel c (Some a) = false ->
-    restrict c (act a;; P) ≈ act a;; restrict c P.
-  Proof.
-    unfold restrict, act; intros * NEQ.
-    rewrite interp_bind, interp_trigger.
-    cbn in *; destruct a; rewrite NEQ; reflexivity.
-  Qed. 
-
-  Lemma Restrict_sem_aux :
-    forall P a c P',
-      use_channel c a = false ->
-      P ⊢a→ccs P' ->
-      restrict c P ⊢a→ccs restrict c P'.
-  Proof.
-    intros * NEQ STEP.
-    induction STEP.
-    - rewrite H, restrict_tau.
-      eapply S_Tau; [| reflexivity]; auto. 
-    - rewrite H.
-      (* Need to work up to eutt *)
-  Admitted.
-     
-  Lemma Restrict_sem :
-    forall P a c P',
-      use_channel c a = false ->
-      P ⊢a→sem P' ->
-      P ∖ c ⊢a→sem P' ∖ c.
-  Proof.
-    intros * NEQ STEP.
-    apply Restrict_sem_aux; auto.
-  Qed.    
-
-  Theorem model_complete :
-    forall P a Q, 
-      P ⊢a→op Q ->
-      P ⊢a→sem Q.
-  Proof.
-    intros * StepOp.
-    (* Lock-step simulation *)
-    induction StepOp;
-      try now constructor.
-    + apply SumL_sem; assumption. 
-
-    + apply SumR_sem; assumption. 
-      
-    + apply ParL_sem; assumption. 
-
-    + apply ParR_sem; assumption. 
-    
-    + eapply ParS_sem; eassumption. 
-       
-    + (* Restrict *)
-      apply Restrict_sem; assumption.
-
-  Qed.
-
-  Theorem model_correct_complete :
-    forall P, bisim P P.
-  Proof.
-    pcofix CIH.
-    intros P.
-    pfold.
-    econstructor.
-    split.
-    - (* The denotational side can simulate the operational semantics *)
-      intros a P' StepOp.
-      exists P'.
-      split; [| right; auto].
-      clear CIH r.
-      apply model_complete; auto.
-
-    - (* The operational side can simulate the denotational semantics *)
-      intros a P' StepSem.
-      exists P'; split; [| auto].
-     admit.
-  Admitted.
-
-End EquivSem.
+Lemma para_unfold : forall P Q, para P Q ≅ para_ P Q.
+Proof.
+  intros.
+  apply observing_sub_eqit.
+  constructor.
+  reflexivity.
+Qed.

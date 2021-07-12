@@ -6,6 +6,7 @@
    Syntax
    Operational
    Denotational
+   EquivalenceDO
  )
  (theories ITree)
 )
