@@ -225,7 +225,7 @@ Section Semantics.
   Definition h_restrict c : Handler ccsE ccsE := 
     case_ h_trigger (case_ (h_restrict_ c) h_trigger).
 
-  Definition restrict : chan -> ccs -> ccs :=
+  Definition restrict {X} : chan -> ccsT X -> ccsT X :=
     fun c P =>
       interp (h_restrict c) P.
 

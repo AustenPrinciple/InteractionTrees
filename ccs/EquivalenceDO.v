@@ -402,36 +402,36 @@ Section EquivSem.
       eapply S_Sched3_S; [constructor; unfold synch; rewrite bind_trigger; reflexivity | reflexivity].
   Qed.
 
-  #[global] Instance restrict_eq_itree c : 
-      Proper (eq_itree eq ==> eq_itree eq) (restrict c).
+  #[global] Instance restrict_eq_itree {X} c : 
+      Proper (eq_itree eq ==> eq_itree eq) (@restrict X c).
   Proof.
     unfold restrict; do 2 red; intros * EQ; rewrite EQ; reflexivity.
   Qed.
 
-  #[global] Instance restrict_eutt c : 
-      Proper (eutt eq ==> eutt eq) (restrict c).
+  #[global] Instance restrict_eutt {X} c : 
+      Proper (eutt eq ==> eutt eq) (@restrict X c).
   Proof.
     unfold restrict; do 2 red; intros * EQ; rewrite EQ; reflexivity.
   Qed.
 
-  Lemma restrict_tau : forall c P,
-    restrict c (Tau P) ≅ Tau (restrict c P).
+  Lemma restrict_tau : forall {X} c P,
+    restrict c (Tau P) ≅ Tau (@restrict X c P).
   Proof.
     unfold restrict; intros; rewrite interp_tau; reflexivity.
   Qed. 
 
-  Lemma restrict_act : forall c P a,
+  Lemma restrict_act : forall {X} c P a,
     use_channel c (Some a) = false ->
-    restrict c (act a;; P) ≈ act a;; restrict c P.
+    @restrict X c (act a;; P) ≈ act a;; restrict c P.
   Proof.
     unfold restrict, act; intros * NEQ.
     rewrite interp_bind, interp_trigger.
     cbn in *; destruct a; rewrite NEQ; reflexivity.
   Qed. 
 
-  Lemma restrict_synch : forall c P,
+  Lemma restrict_synch : forall {X} c P,
     use_channel c None = false ->
-    restrict c (synch;; P) ≈ synch;; restrict c P.
+    @restrict X c (synch;; P) ≈ synch;; restrict c P.
   Proof.
     unfold restrict, synch; intros * NEQ.
     rewrite interp_bind, interp_trigger.
@@ -575,7 +575,7 @@ Section EquivSem.
   .
 
   Lemma restrict_done : forall c,
-    restrict c done ≈ done.
+    restrict c done ≅ done.
   Proof.
     intros; unfold restrict, done at 1; rewrite interp_ret; reflexivity.
   Qed.
@@ -614,21 +614,20 @@ Section EquivSem.
     cbn; intros * H; apply Bool.orb_false_elim in H; apply H.
   Qed.
 
-  Definition eutt_head R : head -> head -> Prop :=
+  Definition eq_head : head -> head -> Prop :=
     fun h1 h2 =>
       match h1,h2 with
       | HDone, HDone => True
-      | HSynch t1, HSynch t2 => eutt R t1 t2
-      | HAct a1 t1, HAct a2 t2 => a1 = a2 /\ eutt R t1 t2
+      | HSynch t1, HSynch t2 => t1 ≈ t2
+      | HAct a1 t1, HAct a2 t2 => a1 = a2 /\ t1 ≈ t2
       | _, _ => False
       end.
-  Hint Unfold eutt_head : core.
+  Hint Unfold eq_head : core.
 
   Global Instance get_hd_eutt : 
-  forall R,
-    Proper (eutt R ==> eutt (eutt_head R)) get_hd.
+    Proper (eutt eq ==> eutt eq_head) get_hd.
   Proof.
-    intros R; do 2 red.
+    do 2 red.
     einit.
     ecofix CIH.
     intros * EQ.
@@ -650,11 +649,6 @@ Section EquivSem.
       rewrite get_hd_unfold.
       apply IHEQ.
   Qed.
-
-  Lemma restrict_para : forall c P Q,
-    restrict c (para P Q) ≈ para (restrict c P) (restrict c Q).
-  Proof.
-  Admitted.
 
   (* TODO Actually curate some utils *)
   Ltac break_and := 
@@ -688,10 +682,10 @@ Section EquivSem.
     intros P P' EQP Q Q' EQQ. 
     rewrite 2 para_unfold.
     ebind; econstructor.
-    apply get_hd_eutt with (R := eq); auto. 
+    apply get_hd_eutt; auto. 
     intros uP1 uP2 EQHP.
     ebind; econstructor.
-    apply get_hd_eutt with (R := eq); auto. 
+    apply get_hd_eutt; auto. 
     intros uQ1 uQ2 EQHQ.
     destruct uP1, uP2; cbn in EQHP; try now inversion EQHP; repeat break_and; subst.
     all: destruct uQ1, uQ2; cbn in EQHQ; try (now inversion EQHQ); repeat break_and; subst.
@@ -709,8 +703,58 @@ Section EquivSem.
     unfold plus; apply eutt_eq_bind; intros []; auto.
   Qed.
 
-  Lemma restrict_dead : forall c,
-      restrict c dead ≈ dead.
+  Lemma restrict_bind : forall {X} c (P : ccsT X) (K : X -> ccs),
+    restrict c (x <- P;; K x) ≅
+    x <- restrict c P;; restrict c (K x).
+  Proof.
+    unfold restrict; intros; rewrite interp_bind; reflexivity.
+  Qed.
+
+  Definition eq_head_restrict c : head -> head -> Prop :=
+    fun h1 h2 =>
+      match h1,h2 with
+      | HDone, HDone => True
+      | HSynch t1, HSynch t2 => restrict c t1 ≈ t2
+      | HAct a1 t1, HAct a2 t2 => a1 = a2 /\ restrict c t1 ≈ t2
+      | _, _ => False
+      end.
+  Hint Unfold eq_head_restrict : core.
+
+  (* We need to be careful to push into R the restriction over the 
+     remaining of the tree in the case where we take the head first
+  *)
+  Lemma restrict_get_hd : forall c P,
+    eutt (eq_head_restrict c) (restrict c (get_hd P)) (get_hd (restrict c P)).
+  Proof.
+    intros c.
+    einit; ecofix CIH; intros P.
+  Admitted.
+
+  Lemma restrict_para : forall c P Q,
+    restrict c (para P Q) ≈ para (restrict c P) (restrict c Q).
+  Proof.
+    intros c.
+    einit; ecofix CIH.
+    intros.
+    rewrite 2 para_unfold.
+    rewrite restrict_bind.
+    ebind; econstructor.
+    apply restrict_get_hd. 
+    intros hdP hdP' EQP.
+    rewrite restrict_bind.
+    ebind; econstructor.
+    apply restrict_get_hd.
+    intros hdQ hdQ' EQQ.
+    destruct hdP, hdP'; cbn in EQP; try now inversion EQP; repeat break_and; subst.
+    all: destruct hdQ, hdQ'; cbn in EQQ; try (now inversion EQQ); repeat break_and; subst.
+    rewrite restrict_done; reflexivity.
+    (* TODO: para should probably use [synch] rather than [vis Synch], that'd
+      simplify stuff *)
+    (* rewrite restrict_synch. *)
+  Admitted.
+ 
+  Lemma restrict_dead : forall {X} c,
+      @restrict X c dead ≈ dead.
   Proof.
     intros; unfold restrict, dead. 
     rewrite interp_bind, interp_trigger.
@@ -724,8 +768,8 @@ Section EquivSem.
     apply restrict_dead.
   Qed.
  
-  Lemma restrict_commut : forall P c c',
-    restrict c (restrict c' P) ≈ restrict c' (restrict c P).
+  Lemma restrict_commut : forall {X} P c c',
+    @restrict X c (restrict c' P) ≈ restrict c' (restrict c P).
   Proof.
     intros; revert P.
     einit.
@@ -752,7 +796,7 @@ Section EquivSem.
     ⟦P ∖ c⟧ ≈ ⟦P⟧.
   Proof.
     intros *; induction P; intros NIN.
-    - apply restrict_done.
+    - cbn; rewrite restrict_done; reflexivity.
     - apply fresh_channel_act in NIN as [? ?].
       cbn; rewrite restrict_act; auto.
       apply eutt_eq_bind; intros []; auto.
@@ -833,7 +877,7 @@ Section EquivSem.
 
   (* BEGIN PROOFS IN PROGRESS FOR THE ADMITTED LEMMAS ABOVE *)
 
-  Definition eq_head R : head -> head -> Prop :=
+  Definition eq_head' R : head -> head -> Prop :=
     fun h1 h2 =>
       match h1,h2 with
       | HDone, HDone => True
@@ -841,10 +885,10 @@ Section EquivSem.
       | HAct a1 t1, HAct a2 t2 => a1 = a2 /\ eq_itree R t1 t2
       | _, _ => False
       end.
-  Hint Unfold eq_head : core.
+  Hint Unfold eq_head' : core.
 
   Global Instance get_hd_eq_itree {R} :
-    Proper (eq_itree R ==> eq_itree (eq_head R)) get_hd.
+    Proper (eq_itree R ==> eq_itree (eq_head' R)) get_hd.
   Proof.
     do 2 red.
     ginit.
@@ -952,7 +996,7 @@ Section EquivSem.
     - (* Ret *)
       pose proof (get_hd_unfold (Ret x)) as Eq;
         cbn in Eq.
-      apply FSTRet with (eq_head R) HDone.
+      apply FSTRet with (eq_head' R) HDone.
       apply get_hd_eq_itree in H.
       now rewrite Eq in H.
     - (* Tau *)
