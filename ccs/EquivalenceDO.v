@@ -614,21 +614,94 @@ Section EquivSem.
     cbn; intros * H; apply Bool.orb_false_elim in H; apply H.
   Qed.
 
+  Definition eutt_head R : head -> head -> Prop :=
+    fun h1 h2 =>
+      match h1,h2 with
+      | HDone, HDone => True
+      | HSynch t1, HSynch t2 => eutt R t1 t2
+      | HAct a1 t1, HAct a2 t2 => a1 = a2 /\ eutt R t1 t2
+      | _, _ => False
+      end.
+  Hint Unfold eutt_head : core.
+
+  Global Instance get_hd_eutt : 
+  forall R,
+    Proper (eutt R ==> eutt (eutt_head R)) get_hd.
+  Proof.
+    intros R; do 2 red.
+    einit.
+    ecofix CIH.
+    intros * EQ.
+    punfold EQ.
+    setoid_rewrite get_hd_unfold.
+    induction EQ; try inv CHECK.
+    - estep; constructor; reflexivity.
+    - estep; pclearbot. constructor; auto with paco.
+    - pclearbot.
+      destruct e as [? | [? | [? | ?]]].
+      + estep; intros ?; ebase.
+      + destruct a; estep.
+      + destruct s; estep.
+      + estep.
+    - rewrite tau_euttge. 
+      rewrite get_hd_unfold.
+      apply IHEQ.
+    - rewrite tau_euttge. 
+      rewrite get_hd_unfold.
+      apply IHEQ.
+  Qed.
+
   Lemma restrict_para : forall c P Q,
     restrict c (para P Q) ≈ para (restrict c P) (restrict c Q).
   Proof.
   Admitted.
 
+  (* TODO Actually curate some utils *)
+  Ltac break_and := 
+    match goal with 
+    | h : _ /\ _ |- _ => destruct h 
+    end.
+
+  (* TODO Move to itrees *)
+  Lemma euttG_trigger :
+    forall {E : Type -> Type} {R1 R2 : Type} (RR : R1 -> R2 -> Prop)
+      (rH rL : itree E R1 -> itree E R2 -> Prop)
+      (gL : forall x : itree E R1, (fun _ : itree E R1 => itree E R2) x -> Prop)
+      (gH : itree E R1 -> itree E R2 -> Prop) (u : Type) 
+      (e : E u) (k1 : u -> itree E R1) (k2 : u -> itree E R2),
+    (forall v : u, euttG RR gH gH gH gH (k1 v) (k2 v)) ->
+    euttG RR rH rL gL gH (x <- trigger e;; k1 x) (x <- trigger e;; k2 x).
+  Proof.
+    intros.
+    rewrite 2 bind_trigger. 
+    apply euttG_vis; auto.
+  Qed.
+        
+  Ltac etrigger :=
+     repeat red; under_forall ltac:(eapply euttG_trigger; eauto with paco).
+
   #[global] Instance para_eutt :
     Proper (eutt eq ==> eutt eq ==> eutt eq) para.
   Proof.
+    do 3 red.
+    einit; ecofix CIH.
     intros P P' EQP Q Q' EQQ. 
     rewrite 2 para_unfold.
-  (* Some work to be done there since we need to break ≈ temporarily 
-     to go under [get_hd].
-  *)
-  Admitted.
-
+    ebind; econstructor.
+    apply get_hd_eutt with (R := eq); auto. 
+    intros uP1 uP2 EQHP.
+    ebind; econstructor.
+    apply get_hd_eutt with (R := eq); auto. 
+    intros uQ1 uQ2 EQHQ.
+    destruct uP1, uP2; cbn in EQHP; try now inversion EQHP; repeat break_and; subst.
+    all: destruct uQ1, uQ2; cbn in EQHQ; try (now inversion EQHQ); repeat break_and; subst.
+    all: try estep. 
+    all: try (unfold branch2; etrigger; intros []; estep).
+    break_match_goal.
+    unfold branch3; etrigger; intros []; estep.
+    unfold branch2; etrigger; intros []; estep.
+  Qed.
+    
   #[global] Instance plus_eutt :
     Proper (eutt eq ==> eutt eq ==> eutt eq) plus.
   Proof.
