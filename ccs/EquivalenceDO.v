@@ -134,6 +134,30 @@ Section Inversion_Lemma.
     intros; edestruct @eqitree_inv_Vis_r as (? & abs &?); eauto; inv abs.
   Qed.
 
+  Lemma eutt_ret_vis_abs : forall {U} e (k : U -> itree E R2) x,
+    eutt RR (Ret x) (Vis e k) -> False.
+  Proof.
+   intros * abs; apply eqit_inv in abs; inv abs.
+  Qed.
+
+  Lemma eutt_vis_ret_abs : forall {U} e (k : U -> itree E R1) x,
+    eutt RR (Vis e k) (Ret x) -> False.
+  Proof.
+   intros * abs; apply eqit_inv in abs; inv abs.
+  Qed.
+
+  Lemma eutt_ret_trigger_abs : forall {U} e (k : U -> itree E R2) x,
+    eutt RR (Ret x) (x <- trigger e;; k x) -> False.
+  Proof.
+   intros * abs; apply eqit_inv in abs; inv abs.
+  Qed.
+
+  Lemma eutt_trigger_ret_abs : forall {U} e (k : U -> itree E R1) x,
+    eutt RR (x <- trigger e;; k x) (Ret x) -> False.
+  Proof.
+   intros * abs; apply eqit_inv in abs; inv abs.
+  Qed.
+
 End Inversion_Lemma.
 
 Ltac inv_eqitree H :=
@@ -510,11 +534,205 @@ Section EquivSem.
 
   Qed.
 
+  Definition stuck_ccs P := forall a Q, ~ P ⊢a→ccs Q.
+  
+  Lemma done_cannot_step : stuck_ccs done.
+  Proof.
+    red; unfold done; intros * STEP.
+    inv STEP.
+    all: match goal with 
+    | h : eutt _ (Ret _) _ |- _ =>  
+    eapply eutt_ret_trigger_abs, h 
+    end.
+  Qed.   
+
+  Ltac abs_eutt H := apply eqit_inv in H; inv H.
+  Ltac is_abs := 
+    match goal with 
+    | h : eutt _ _ _ |- _ => abs_eutt h 
+    end. 
+
+  (* Makes the canonization super-inefficient, might want to compute the liste of bound variables in one pass *)
+  Fixpoint use_channel_term (P : term) (c : chan) : bool :=
+    match P with 
+    | 0 => false 
+    | ↑ c' ⋅ P => (c =? c')%string || use_channel_term P c
+    | ↓ c' ⋅ P => (c =? c')%string || use_channel_term P c
+    | P ⊕ Q | P ∥ Q => use_channel_term P c || use_channel_term Q c
+    | P ∖ c' => use_channel_term P c
+    end.
+  Notation "c ∈ P" := (use_channel_term P c = true) (at level 80).
+  Notation "c ∉ P" := (use_channel_term P c = false) (at level 80).
+
+  Fixpoint canonize (P : term) : term :=
+    match P with 
+    | 0 => 0
+    | a ⋅ P => a ⋅ (canonize P)
+    | P ⊕ Q => canonize P ⊕ canonize Q
+    | P ∥ Q => canonize P ∥ canonize Q 
+    | P ∖ c => if use_channel_term P c then canonize P ∖ c else canonize P
+    end
+  .
+
+  Lemma restrict_done : forall c,
+    restrict c done ≈ done.
+  Proof.
+    intros; unfold restrict, done at 1; rewrite interp_ret; reflexivity.
+  Qed.
+
+  Ltac break_match_goal :=
+    match goal with
+    | [ |- context [ match ?X with _ => _ end ] ] =>
+      match type of X with
+      | sumbool _ _ => destruct X
+      | _ => destruct X eqn:?
+      end
+    end.
+
+  Ltac break_match_hyp h :=
+    match type of h with
+    | context [ match ?X with _ => _ end ] =>
+      match type of X with
+      | sumbool _ _ => destruct X
+      | _ => destruct X eqn:?
+      end
+    end.
+
+  Lemma fresh_channel_act : forall c a P,
+    c ∉ a ⋅ P -> 
+    use_channel c (Some a) = false /\ c ∉ P.
+  Proof.
+    cbn; intros * H; break_match_hyp H; subst; auto.
+    apply Bool.orb_false_elim in H; apply H.
+    apply Bool.orb_false_elim in H; apply H.
+  Qed.
+
+  Lemma fresh_channel_para : forall c P Q,
+    c ∉ P ∥ Q ->
+    c ∉ P /\ c ∉ Q.
+  Proof.
+    cbn; intros * H; apply Bool.orb_false_elim in H; apply H.
+  Qed.
+
+  Lemma restrict_para : forall c P Q,
+    restrict c (para P Q) ≈ para (restrict c P) (restrict c Q).
+  Proof.
+  Admitted.
+
+  #[global] Instance para_eutt :
+    Proper (eutt eq ==> eutt eq ==> eutt eq) para.
+  Proof.
+    intros P P' EQP Q Q' EQQ. 
+    rewrite 2 para_unfold.
+  (* Some work to be done there since we need to break ≈ temporarily 
+     to go under [get_hd].
+  *)
+  Admitted.
+
+  #[global] Instance plus_eutt :
+    Proper (eutt eq ==> eutt eq ==> eutt eq) plus.
+  Proof.
+    intros P P' EQP Q Q' EQQ. 
+    unfold plus; apply eutt_eq_bind; intros []; auto.
+  Qed.
+
+  Lemma restrict_dead : forall c,
+      restrict c dead ≈ dead.
+  Proof.
+    intros; unfold restrict, dead. 
+    rewrite interp_bind, interp_trigger.
+    cbn; unfold h_trigger.
+    apply eutt_eq_bind; intros [].
+  Qed.
+
+  Lemma restrict_dead' : forall c,
+      interp (h_restrict c) (@dead unit _ _) ≈ dead.
+  Proof.
+    apply restrict_dead.
+  Qed.
+ 
+  Lemma restrict_commut : forall P c c',
+    restrict c (restrict c' P) ≈ restrict c' (restrict c P).
+  Proof.
+    intros; revert P.
+    einit.
+    ecofix CIH.
+    intros P.
+    rewrite (itree_eta P). 
+    unfold restrict. 
+    destruct (observe P).
+    - rewrite !interp_ret; eret.
+    - rewrite !interp_tau; etau.
+    - rewrite !interp_vis, !interp_bind.
+      ebind; apply pbc_intro_h with eq.
+      + destruct e as [| [| []]]; cbn; unfold h_trigger; cbn.
+        all: try (rewrite !interp_trigger; cbn;unfold h_trigger; cbn; reflexivity).
+        destruct a as [[|]]; cbn; repeat break_match_goal; cbn.
+        all: rewrite ?restrict_dead',?interp_trigger; cbn; rewrite ?Heqb,?Heqb0; reflexivity.
+      + intros ? ? ->.
+        rewrite !interp_tau.
+        etau.
+  Qed.
+    
+  Lemma restrict_unused_channel : forall P c,
+    c ∉ P ->
+    ⟦P ∖ c⟧ ≈ ⟦P⟧.
+  Proof.
+    intros *; induction P; intros NIN.
+    - apply restrict_done.
+    - apply fresh_channel_act in NIN as [? ?].
+      cbn; rewrite restrict_act; auto.
+      apply eutt_eq_bind; intros []; auto.
+    - cbn in *. rewrite restrict_para; auto.
+      apply fresh_channel_para in NIN as []; rewrite IHP1,IHP2; auto.
+      reflexivity.
+    - cbn in *. rewrite restrict_plus; auto.
+      apply fresh_channel_para in NIN as []; rewrite IHP1,IHP2; auto.
+      reflexivity.
+    - cbn in *.
+      rewrite restrict_commut, IHP; auto.
+      reflexivity.
+  Qed.
+
+  Lemma canonize_equivalence_class :
+    forall P Q, 
+      ⟦P⟧ ≈ ⟦Q⟧ <-> canonize P = canonize Q.
+  Proof.
+    intros *; split; intros EQ.
+    - admit.
+    - revert Q EQ.
+      induction P; cbn.
+      + induction Q; intros EQ; try now inversion EQ.
+        cbn in EQ. 
+        break_match_hyp EQ; [inv EQ |].
+        rewrite IHQ; auto. 
+        symmetry; apply restrict_unused_channel; auto.
+      + induction Q; cbn; intros EQ; try now inversion EQ.
+        inv EQ.
+        apply eutt_eq_bind; intros []; auto.
+        break_match_hyp EQ; [inv EQ |].
+        rewrite IHQ; auto. 
+        symmetry; apply restrict_unused_channel; auto.
+      + induction Q; cbn; intros EQ; try now inversion EQ.
+        inv EQ.
+  Abort.
+
+  Lemma act_sem_inv : forall a b P Q,
+    a ⋅ P ⊢b→sem Q ->
+    canonize Q = canonize P /\ b = Some a.
+  Proof.
+  Abort.
+
   Theorem model_correct :
     forall P a Q, 
       P ⊢a→sem Q ->
       P ⊢a→op Q.
   Proof.
+    induction P; intros * STEP. 
+    - red in STEP. 
+      exfalso; eapply done_cannot_step; eauto.
+    - red in STEP.
+      cbn in STEP.
   Admitted.
 
   Theorem model_correct_complete :
@@ -653,15 +871,6 @@ Section EquivSem.
           eauto.
       + assumption.
   Qed.
-
-  Ltac break_match_goal :=
-    match goal with
-    | [ |- context [ match ?X with _ => _ end ] ] =>
-      match type of X with
-      | sumbool _ _ => destruct X
-      | _ => destruct X eqn:?
-      end
-    end.
 
   Theorem finite_head : forall P, Finite P -> FiniteSchedTree (get_hd P).
   Proof.

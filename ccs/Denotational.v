@@ -214,7 +214,7 @@ Section Semantics.
   Definition h_trigger {E F} `{E -< F} : E ~> itree F :=
     fun _ e => trigger e.
 
-  Definition h_restrict (c : chan) : Handler ActionE ccsE :=
+  Definition h_restrict_ (c : chan) : Handler ActionE ccsE :=
     fun _ e => let '(Act a) := e in
             match a with
             | Send c'
@@ -222,9 +222,12 @@ Section Semantics.
               if (c =? c')%string then dead else trigger e
             end.
 
+  Definition h_restrict c : Handler ccsE ccsE := 
+    case_ h_trigger (case_ (h_restrict_ c) h_trigger).
+
   Definition restrict : chan -> ccs -> ccs :=
     fun c P =>
-      interp (case_ h_trigger (case_ (h_restrict c) h_trigger)) P.
+      interp (h_restrict c) P.
 
   Fixpoint model (t : term) : ccs :=
     match t with
