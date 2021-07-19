@@ -171,13 +171,13 @@ Ltac inv_eqitree H :=
   | eq_itree _ (Ret _) (Ret _)   => apply eqit_inv_Ret in H
   | _ => idtac
   end.
- 
+
 Section EquivSem.
 
-  Notation step_op  := Operational.step.
+  Notation step_op := Operational.step.
 
   (* Lifting the operational stepping over itrees to the syntax
-  via representation *)
+     via representation *)
   Definition step_sem : term -> option action -> term -> Prop :=
     fun t1 ma t2 => step_ccs (model t1) ma (model t2).
 
@@ -384,7 +384,7 @@ Section EquivSem.
     forall P a Q P' Q',
       P ⊢Some a→sem P' ->
       Q ⊢Some (op a)→sem Q' ->
-      P ∥ Q ⊢None→sem P' ∥ Q'. 
+      P ∥ Q ⊢None→sem P' ∥ Q'.
   Proof.
     intros * STEP_P STEP_Q.
     unfold step_sem in *.
@@ -396,19 +396,19 @@ Section EquivSem.
     * apply step_ccs_is_returned_by_get_hd; assumption.
     * apply finite_get_hd_FST, model_finite.
     * apply step_ccs_is_returned_by_get_hd; assumption.
-    * cbn. 
+    * cbn.
       unfold are_opposite.
       rewrite op_involutive, eqb_action_refl.
       eapply S_Sched3_S; [constructor; unfold synch; rewrite bind_trigger; reflexivity | reflexivity].
   Qed.
 
-  #[global] Instance restrict_eq_itree c : 
+  #[global] Instance restrict_eq_itree c :
       Proper (eq_itree eq ==> eq_itree eq) (restrict c).
   Proof.
     unfold restrict; do 2 red; intros * EQ; rewrite EQ; reflexivity.
   Qed.
 
-  #[global] Instance restrict_eutt c : 
+  #[global] Instance restrict_eutt c :
       Proper (eutt eq ==> eutt eq) (restrict c).
   Proof.
     unfold restrict; do 2 red; intros * EQ; rewrite EQ; reflexivity.
@@ -418,7 +418,7 @@ Section EquivSem.
     restrict c (Tau P) ≅ Tau (restrict c P).
   Proof.
     unfold restrict; intros; rewrite interp_tau; reflexivity.
-  Qed. 
+  Qed.
 
   Lemma restrict_act : forall c P a,
     use_channel c (Some a) = false ->
@@ -427,7 +427,7 @@ Section EquivSem.
     unfold restrict, act; intros * NEQ.
     rewrite interp_bind, interp_trigger.
     cbn in *; destruct a; rewrite NEQ; reflexivity.
-  Qed. 
+  Qed.
 
   Lemma restrict_synch : forall c P,
     use_channel c None = false ->
@@ -436,7 +436,7 @@ Section EquivSem.
     unfold restrict, synch; intros * NEQ.
     rewrite interp_bind, interp_trigger.
     reflexivity.
-  Qed. 
+  Qed.
 
   Lemma restrict_plus : forall c L R,
     restrict c (plus L R) ≈ plus (restrict c L) (restrict c R).
@@ -445,7 +445,7 @@ Section EquivSem.
     rewrite interp_bind, interp_trigger.
     cbn.
     apply eutt_eq_bind; intros []; reflexivity.
-  Qed. 
+  Qed.
 
   Lemma restrict_branch2 : forall c L R,
     restrict c (branch2 L R) ≈ branch2 (restrict c L) (restrict c R).
@@ -454,7 +454,7 @@ Section EquivSem.
     rewrite interp_bind, interp_trigger.
     cbn.
     apply eutt_eq_bind; intros []; reflexivity.
-  Qed. 
+  Qed.
 
   Lemma restrict_branch3 : forall c L R S,
     restrict c (branch3 L R S) ≈ branch3 (restrict c L) (restrict c R) (restrict c S).
@@ -463,7 +463,7 @@ Section EquivSem.
     rewrite interp_bind, interp_trigger.
     cbn.
     apply eutt_eq_bind; intros []; reflexivity.
-  Qed. 
+  Qed.
 
   Lemma Restrict_sem_aux :
     forall P a c P',
@@ -475,29 +475,29 @@ Section EquivSem.
     induction STEP; rewrite H.
     - rewrite restrict_act; auto.
       constructor; reflexivity.
-    - rewrite restrict_synch; auto. 
+    - rewrite restrict_synch; auto.
       constructor; reflexivity.
     - rewrite restrict_plus.
-      eapply S_Plus_L; eauto. 
+      eapply S_Plus_L; eauto.
       reflexivity.
     - rewrite restrict_plus.
       eapply S_Plus_R; eauto.
       reflexivity.
     - rewrite restrict_branch2.
       eapply S_Sched2_L; [| reflexivity].
-      eauto. 
+      eauto.
     - rewrite restrict_branch2.
       eapply S_Sched2_R; [| reflexivity].
-      eauto. 
+      eauto.
     - rewrite restrict_branch3.
       eapply S_Sched3_L; [| reflexivity].
-      eauto. 
+      eauto.
     - rewrite restrict_branch3.
       eapply S_Sched3_R; [| reflexivity].
-      eauto. 
+      eauto.
     - rewrite restrict_branch3.
       eapply S_Sched3_S; [| reflexivity].
-      eauto. 
+      eauto.
   Qed.
 
   Lemma Restrict_sem :
@@ -508,10 +508,10 @@ Section EquivSem.
   Proof.
     intros * NEQ STEP.
     apply Restrict_sem_aux; auto.
-  Qed.    
+  Qed.
 
   Theorem model_complete :
-    forall P a Q, 
+    forall P a Q,
       P ⊢a→op Q ->
       P ⊢a→sem Q.
   Proof.
@@ -519,43 +519,36 @@ Section EquivSem.
     (* Lock-step simulation *)
     induction StepOp;
       try now constructor.
-    + apply SumL_sem; assumption. 
-
-    + apply SumR_sem; assumption. 
-      
-    + apply ParL_sem; assumption. 
-
-    + apply ParR_sem; assumption. 
-    
-    + eapply ParS_sem; eassumption. 
-       
-    + (* Restrict *)
-      apply Restrict_sem; assumption.
-
+    + apply SumL_sem; assumption.
+    + apply SumR_sem; assumption.
+    + apply ParL_sem; assumption.
+    + apply ParR_sem; assumption.
+    + eapply ParS_sem; eassumption.
+    + apply Restrict_sem; assumption.
   Qed.
 
   Definition stuck_ccs P := forall a Q, ~ P ⊢a→ccs Q.
-  
+
   Lemma done_cannot_step : stuck_ccs done.
   Proof.
     red; unfold done; intros * STEP.
     inv STEP.
-    all: match goal with 
-    | h : eutt _ (Ret _) _ |- _ =>  
-    eapply eutt_ret_trigger_abs, h 
-    end.
-  Qed.   
+    all: match goal with
+         | h : eutt _ (Ret _) _ |- _ =>
+           eapply eutt_ret_trigger_abs, h
+         end.
+  Qed.
 
   Ltac abs_eutt H := apply eqit_inv in H; inv H.
-  Ltac is_abs := 
-    match goal with 
-    | h : eutt _ _ _ |- _ => abs_eutt h 
-    end. 
+  Ltac is_abs :=
+    match goal with
+    | h : eutt _ _ _ |- _ => abs_eutt h
+    end.
 
   (* Makes the canonization super-inefficient, might want to compute the liste of bound variables in one pass *)
   Fixpoint use_channel_term (P : term) (c : chan) : bool :=
-    match P with 
-    | 0 => false 
+    match P with
+    | 0 => false
     | ↑ c' ⋅ P => (c =? c')%string || use_channel_term P c
     | ↓ c' ⋅ P => (c =? c')%string || use_channel_term P c
     | P ⊕ Q | P ∥ Q => use_channel_term P c || use_channel_term Q c
@@ -565,11 +558,11 @@ Section EquivSem.
   Notation "c ∉ P" := (use_channel_term P c = false) (at level 80).
 
   Fixpoint canonize (P : term) : term :=
-    match P with 
+    match P with
     | 0 => 0
     | a ⋅ P => a ⋅ (canonize P)
     | P ⊕ Q => canonize P ⊕ canonize Q
-    | P ∥ Q => canonize P ∥ canonize Q 
+    | P ∥ Q => canonize P ∥ canonize Q
     | P ∖ c => if use_channel_term P c then canonize P ∖ c else canonize P
     end
   .
@@ -599,7 +592,7 @@ Section EquivSem.
     end.
 
   Lemma fresh_channel_act : forall c a P,
-    c ∉ a ⋅ P -> 
+    c ∉ a ⋅ P ->
     use_channel c (Some a) = false /\ c ∉ P.
   Proof.
     cbn; intros * H; break_match_hyp H; subst; auto.
@@ -624,9 +617,9 @@ Section EquivSem.
       end.
   Hint Unfold eutt_head : core.
 
-  Global Instance get_hd_eutt : 
-  forall R,
-    Proper (eutt R ==> eutt (eutt_head R)) get_hd.
+  Global Instance get_hd_eutt :
+    forall R,
+      Proper (eutt R ==> eutt (eutt_head R)) get_hd.
   Proof.
     intros R; do 2 red.
     einit.
@@ -643,10 +636,10 @@ Section EquivSem.
       + destruct a; estep.
       + destruct s; estep.
       + estep.
-    - rewrite tau_euttge. 
+    - rewrite tau_euttge.
       rewrite get_hd_unfold.
       apply IHEQ.
-    - rewrite tau_euttge. 
+    - rewrite tau_euttge.
       rewrite get_hd_unfold.
       apply IHEQ.
   Qed.
@@ -657,9 +650,9 @@ Section EquivSem.
   Admitted.
 
   (* TODO Actually curate some utils *)
-  Ltac break_and := 
-    match goal with 
-    | h : _ /\ _ |- _ => destruct h 
+  Ltac break_and :=
+    match goal with
+    | h : _ /\ _ |- _ => destruct h
     end.
 
   (* TODO Move to itrees *)
@@ -667,16 +660,16 @@ Section EquivSem.
     forall {E : Type -> Type} {R1 R2 : Type} (RR : R1 -> R2 -> Prop)
       (rH rL : itree E R1 -> itree E R2 -> Prop)
       (gL : forall x : itree E R1, (fun _ : itree E R1 => itree E R2) x -> Prop)
-      (gH : itree E R1 -> itree E R2 -> Prop) (u : Type) 
+      (gH : itree E R1 -> itree E R2 -> Prop) (u : Type)
       (e : E u) (k1 : u -> itree E R1) (k2 : u -> itree E R2),
     (forall v : u, euttG RR gH gH gH gH (k1 v) (k2 v)) ->
     euttG RR rH rL gL gH (x <- trigger e;; k1 x) (x <- trigger e;; k2 x).
   Proof.
     intros.
-    rewrite 2 bind_trigger. 
+    rewrite 2 bind_trigger.
     apply euttG_vis; auto.
   Qed.
-        
+
   Ltac etrigger :=
      repeat red; under_forall ltac:(eapply euttG_trigger; eauto with paco).
 
@@ -685,34 +678,34 @@ Section EquivSem.
   Proof.
     do 3 red.
     einit; ecofix CIH.
-    intros P P' EQP Q Q' EQQ. 
+    intros P P' EQP Q Q' EQQ.
     rewrite 2 para_unfold.
     ebind; econstructor.
-    apply get_hd_eutt with (R := eq); auto. 
+    apply get_hd_eutt with (R := eq); auto.
     intros uP1 uP2 EQHP.
     ebind; econstructor.
-    apply get_hd_eutt with (R := eq); auto. 
+    apply get_hd_eutt with (R := eq); auto.
     intros uQ1 uQ2 EQHQ.
     destruct uP1, uP2; cbn in EQHP; try now inversion EQHP; repeat break_and; subst.
     all: destruct uQ1, uQ2; cbn in EQHQ; try (now inversion EQHQ); repeat break_and; subst.
-    all: try estep. 
+    all: try estep.
     all: try (unfold branch2; etrigger; intros []; estep).
     break_match_goal.
     unfold branch3; etrigger; intros []; estep.
     unfold branch2; etrigger; intros []; estep.
   Qed.
-    
+
   #[global] Instance plus_eutt :
     Proper (eutt eq ==> eutt eq ==> eutt eq) plus.
   Proof.
-    intros P P' EQP Q Q' EQQ. 
+    intros P P' EQP Q Q' EQQ.
     unfold plus; apply eutt_eq_bind; intros []; auto.
   Qed.
 
   Lemma restrict_dead : forall c,
       restrict c dead ≈ dead.
   Proof.
-    intros; unfold restrict, dead. 
+    intros; unfold restrict, dead.
     rewrite interp_bind, interp_trigger.
     cbn; unfold h_trigger.
     apply eutt_eq_bind; intros [].
@@ -723,7 +716,7 @@ Section EquivSem.
   Proof.
     apply restrict_dead.
   Qed.
- 
+
   Lemma restrict_commut : forall P c c',
     restrict c (restrict c' P) ≈ restrict c' (restrict c P).
   Proof.
@@ -731,8 +724,8 @@ Section EquivSem.
     einit.
     ecofix CIH.
     intros P.
-    rewrite (itree_eta P). 
-    unfold restrict. 
+    rewrite (itree_eta P).
+    unfold restrict.
     destruct (observe P).
     - rewrite !interp_ret; eret.
     - rewrite !interp_tau; etau.
@@ -746,7 +739,7 @@ Section EquivSem.
         rewrite !interp_tau.
         etau.
   Qed.
-    
+
   Lemma restrict_unused_channel : forall P c,
     c ∉ P ->
     ⟦P ∖ c⟧ ≈ ⟦P⟧.
@@ -768,7 +761,7 @@ Section EquivSem.
   Qed.
 
   Lemma canonize_equivalence_class :
-    forall P Q, 
+    forall P Q,
       ⟦P⟧ ≈ ⟦Q⟧ <-> canonize P = canonize Q.
   Proof.
     intros *; split; intros EQ.
@@ -776,15 +769,15 @@ Section EquivSem.
     - revert Q EQ.
       induction P; cbn.
       + induction Q; intros EQ; try now inversion EQ.
-        cbn in EQ. 
+        cbn in EQ.
         break_match_hyp EQ; [inv EQ |].
-        rewrite IHQ; auto. 
+        rewrite IHQ; auto.
         symmetry; apply restrict_unused_channel; auto.
       + induction Q; cbn; intros EQ; try now inversion EQ.
         inv EQ.
         apply eutt_eq_bind; intros []; auto.
         break_match_hyp EQ; [inv EQ |].
-        rewrite IHQ; auto. 
+        rewrite IHQ; auto.
         symmetry; apply restrict_unused_channel; auto.
       + induction Q; cbn; intros EQ; try now inversion EQ.
         inv EQ.
@@ -797,12 +790,12 @@ Section EquivSem.
   Abort.
 
   Theorem model_correct :
-    forall P a Q, 
+    forall P a Q,
       P ⊢a→sem Q ->
       P ⊢a→op Q.
   Proof.
-    induction P; intros * STEP. 
-    - red in STEP. 
+    induction P; intros * STEP.
+    - red in STEP.
       exfalso; eapply done_cannot_step; eauto.
     - red in STEP.
       cbn in STEP.
@@ -1070,7 +1063,7 @@ Section EquivSem.
         * intro rQ.
           destruct rP, rQ;
             try assumption.
-          -- now apply FRet with eq tt. 
+          -- now apply FRet with eq tt.
           -- admit.
           -- admit.
           -- admit.

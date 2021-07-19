@@ -21,14 +21,14 @@ From Coq Require Import Morphisms.
 (** * An itree-based semantics for CCS
   We define in this file a model for CCS based on interaction trees.
   We take as semantic domain a tree allowing two main kind of interactions:
-  - Scheduling ones, embedding both the internal and parallelism non-determinism 
-    of the language in the trees 
+  - Scheduling ones, embedding both the internal and parallelism non-determinism
+    of the language in the trees
   - Communication and synchronization events.
-  The model is define compositionally via combinators.
+  The model is defined compositionally via combinators.
 
   A notion of stepping is defined on the model as a means to relate
   this semantics to the traditional operational one.
-  *)
+ *)
 
 Section Semantics.
 
@@ -114,10 +114,10 @@ Section Semantics.
   .
 
   (* This version of para avoids requesting unecessary schedules: if it's gonna give the get-go to P,
-    then it doesn't compute the head of Q.
-    The drawback is that it has branches ending in dynamic failure: if we have decided to have them synch,
-    then any path to incompatible heads has to be killed.
-      *)
+     then it doesn't compute the head of Q.
+     The drawback is that it has branches ending in dynamic failure: if we have decided to have them synch,
+     then any path to incompatible heads has to be killed.
+   *)
   Definition para_dead : ccs -> ccs -> ccs :=
     cofix F (P : ccs) (Q : ccs) :=
       branch3
@@ -147,12 +147,12 @@ Section Semantics.
         )
   .
 
-  (* TODO: Reuse full P/Q when their head are ditched 
+  (* TODO: Reuse full P/Q when their head are ditched
      TODO: cas done asymmetric problematic
      Note: We make the scheduler do useless work multiple times
      Question: Could we carry the set of finitely reachable actions at finite depth in the tree?
      Question: Can we always collapse the scheduling head into a single event?
-  *)
+   *)
   Definition para_commit_even_if_not_stepping : ccs -> ccs -> ccs :=
     cofix F (P : ccs) (Q : ccs) :=
       rP <- get_hd P;;
@@ -210,7 +210,7 @@ Section Semantics.
             branch2 (vis Synch   (fun _ => F P' Q))
                     (vis Synch   (fun _ => F P Q'))
           end.
-    
+
   Definition h_trigger {E F} `{E -< F} : E ~> itree F :=
     fun _ e => trigger e.
 
@@ -222,7 +222,7 @@ Section Semantics.
               if (c =? c')%string then dead else trigger e
             end.
 
-  Definition h_restrict c : Handler ccsE ccsE := 
+  Definition h_restrict c : Handler ccsE ccsE :=
     case_ h_trigger (case_ (h_restrict_ c) h_trigger).
 
   Definition restrict : chan -> ccs -> ccs :=
@@ -459,8 +459,8 @@ Section Semantics.
   Lemma step_tau_inv :
     forall P a Q, step (Tau P) a Q -> step P a Q.
   Proof.
-    intros * STEP.
-    rewrite tau_eutt in STEP; auto.
+    intros * Step.
+    rewrite tau_eutt in Step; auto.
   Qed.
 
   Lemma example1: bisim_old (act (↓ "a") ;; done)
@@ -491,7 +491,7 @@ Section Semantics.
     - intros.
       exists Q'.
       split; [| left; apply bisim_refl'].
-      apply step_tau_inv; auto.
+      now apply step_tau_inv.
   Qed.
 
 End Semantics.
@@ -511,7 +511,7 @@ Module DenNotations.
 
   Notation "⟦ P ⟧" := (model P).
   Notation "P '⊢' a '→ccs' Q" := (step_ccs P a Q) (at level 50).
- 
+
 End DenNotations.
 
 Import DenNotations.
