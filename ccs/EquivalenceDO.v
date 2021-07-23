@@ -365,7 +365,6 @@ Section EquivSem.
       + assumption.
   Qed.
 
-  
   Definition eq_head R : head -> head -> Prop :=
     fun h1 h2 =>
       match h1,h2 with
@@ -425,8 +424,10 @@ Section EquivSem.
       + apply eqitree_inv_Tau_r in H as [t' [Eq1 Cong]].
         apply eqitree_inv_Tau_r in H2 as [t'' [Eq2 Cong']].
         rewrite Eq1 in Eq2.
-        rewrite unfold_bind, Eq1.
-        rewrite tau_eutt.
+        rewrite unfold_bind, Eq1, tau_eutt.
+        (* rewrite Cong.
+           missing Proper eq_itree R | bind or step?
+         *)
         admit.
       + apply eqitree_inv_Tau_r in H as [r [Eq1 _]].
         apply eqitree_inv_Vis_r in H2 as [k' [Eq2 ]].
@@ -477,7 +478,9 @@ Section EquivSem.
     induction H.
     - pose proof (get_hd_unfold (act a;; P)) as Eq;
         cbn in Eq.
-      (* rewrite <- H0 in Eq. *)
+      apply Returns_legacyRet.
+      unfold head_of_action.
+      
   Admitted.
 
   Lemma finite_head : forall (P : ccs),
