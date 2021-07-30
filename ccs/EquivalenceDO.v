@@ -24,6 +24,24 @@ From Paco Require Import paco.
 From Coq Require Import Morphisms.
 (* end hide *)
 
+  Ltac break_match_goal :=
+    match goal with
+    | [ |- context [ match ?X with _ => _ end ] ] =>
+      match type of X with
+      | sumbool _ _ => destruct X
+      | _ => destruct X eqn:?
+      end
+    end.
+
+  Ltac break_match_hyp h :=
+    match type of h with
+    | context [ match ?X with _ => _ end ] =>
+      match type of X with
+      | sumbool _ _ => destruct X
+      | _ => destruct X eqn:?
+      end
+    end.
+
 Section Inversion_Lemma.
 
   (* TODO: Push some stuff in the itree library *)
@@ -171,13 +189,13 @@ Ltac inv_eqitree H :=
   | eq_itree _ (Ret _) (Ret _)   => apply eqit_inv_Ret in H
   | _ => idtac
   end.
- 
+
 Section EquivSem.
 
-  Notation step_op  := Operational.step.
+  Notation step_op := Operational.step.
 
   (* Lifting the operational stepping over itrees to the syntax
-  via representation *)
+     via representation *)
   Definition step_sem : term -> option action -> term -> Prop :=
     fun t1 ma t2 => step_ccs (model t1) ma (model t2).
 
@@ -282,648 +300,6 @@ Section EquivSem.
       (forall c, FiniteSchedTree (k c)) ->
       FiniteSchedTree t.
 
-  Lemma step_ccs_through_FST :
-    forall (t : ccsT head) (k : head -> ccs) (q : ccs) a hd,
-     FiniteSchedTree t ->
-     Returns_legacy hd t ->
-     k hd ⊢ a →ccs q ->
-     (hd <- t;; k hd) ⊢ a →ccs q.
-  Admitted.
-
-  Lemma step_ccs_through_FST_weak :
-    forall (t : ccsT head) (k : head -> ccs) (q : ccs) a,
-     FiniteSchedTree t ->
-     (forall hd, k hd ⊢ a →ccs q) ->
-     (hd <- t;; k hd) ⊢ a →ccs q.
-  Admitted.
-
-  Lemma step_ccs_is_returned_by_get_hd :
-    forall (p q : ccs) a,
-      p ⊢ a →ccs q ->
-      Returns_legacy (head_of_action a q) (get_hd p).
-  Admitted.
-
-  Lemma finite_get_hd_FST : forall (p : ccs),
-    Finite p ->
-    FiniteSchedTree (get_hd p).
-  Admitted.
-
-  Lemma model_finite : forall (P : term),
-    Finite ⟦P⟧.
-  Admitted.
-
-  Lemma op_involutive : forall a, op (op a) = a.
-  Proof.
-    intros []; reflexivity.
-  Qed. 
-
-  Lemma SumL_sem :
-    forall P a Q P',
-      P ⊢a→sem P' ->
-      P ⊕ Q ⊢a→sem P'.
-  Proof.
-    intros.
-    apply S_Plus_L with ⟦P⟧ ⟦Q⟧; auto; reflexivity.
-  Qed.
-
-  Lemma SumR_sem :
-    forall P a Q Q',
-      Q ⊢a→sem Q' ->
-      P ⊕ Q ⊢a→sem Q'.
-  Proof.
-    intros.
-    apply S_Plus_R with ⟦P⟧ ⟦Q⟧; auto; reflexivity.
-  Qed.
-
- Lemma ParL_sem :
-    forall P a Q P',
-      P ⊢a→sem P' ->
-      P ∥ Q ⊢a→sem P' ∥ Q. 
-  Proof.
-    intros * STEP.
-    unfold step_sem in *.
-    cbn.
-    rewrite para_unfold.
-    apply step_ccs_through_FST with (head_of_action a ⟦P'⟧).
-    3:apply step_ccs_through_FST_weak.
-    * apply finite_get_hd_FST, model_finite.
-    * apply step_ccs_is_returned_by_get_hd; assumption.
-    * apply finite_get_hd_FST, model_finite.
-    * intros hd.
-      destruct hd eqn:EQHD, a eqn:EQa; cbn;
-        try (constructor; unfold act,synch; rewrite bind_trigger; reflexivity);
-        try (eapply S_Sched2_L; [constructor; unfold act,synch; rewrite bind_trigger; reflexivity | reflexivity]).
-        destruct (are_opposite a1 a0).
-        eapply S_Sched3_L; [constructor; unfold act; rewrite bind_trigger; reflexivity | reflexivity].
-        eapply S_Sched2_L; [constructor; unfold act; rewrite bind_trigger; reflexivity | reflexivity].
-  Qed.
-
-  Lemma ParR_sem :
-    forall P a Q Q',
-      Q ⊢a→sem Q' ->
-      P ∥ Q ⊢a→sem P ∥ Q'. 
-  Proof.
-    intros * STEP.
-    unfold step_sem in *.
-    cbn.
-    rewrite para_unfold.
-    apply step_ccs_through_FST_weak.
-    2:intros; apply step_ccs_through_FST with (head_of_action a ⟦Q'⟧).
-    * apply finite_get_hd_FST, model_finite.
-    * apply finite_get_hd_FST, model_finite.
-    * apply step_ccs_is_returned_by_get_hd; assumption.
-    * destruct hd eqn:EQHD, a eqn:EQa; cbn;
-        try (constructor; unfold act,synch; rewrite bind_trigger; reflexivity);
-        try (eapply S_Sched2_R; [constructor; unfold act,synch; rewrite bind_trigger; reflexivity | reflexivity]).
-        destruct (are_opposite a0 a1).
-        eapply S_Sched3_R; [constructor; unfold act,synch; rewrite bind_trigger; reflexivity | reflexivity].
-        eapply S_Sched2_R; [constructor; unfold act,synch; rewrite bind_trigger; reflexivity | reflexivity].
-  Qed.
-
-  Lemma ParS_sem :
-    forall P a Q P' Q',
-      P ⊢Some a→sem P' ->
-      Q ⊢Some (op a)→sem Q' ->
-      P ∥ Q ⊢None→sem P' ∥ Q'. 
-  Proof.
-    intros * STEP_P STEP_Q.
-    unfold step_sem in *.
-    cbn.
-    rewrite para_unfold.
-    apply step_ccs_through_FST with (head_of_action (Some a) ⟦P'⟧).
-    3:apply step_ccs_through_FST with (head_of_action (Some (op a)) ⟦Q'⟧).
-    * apply finite_get_hd_FST, model_finite.
-    * apply step_ccs_is_returned_by_get_hd; assumption.
-    * apply finite_get_hd_FST, model_finite.
-    * apply step_ccs_is_returned_by_get_hd; assumption.
-    * cbn. 
-      unfold are_opposite.
-      rewrite op_involutive, eqb_action_refl.
-      eapply S_Sched3_S; [constructor; unfold synch; rewrite bind_trigger; reflexivity | reflexivity].
-  Qed.
-
-  #[global] Instance restrict_eq_itree {X} c : 
-      Proper (eq_itree eq ==> eq_itree eq) (@restrict X c).
-  Proof.
-    unfold restrict; do 2 red; intros * EQ; rewrite EQ; reflexivity.
-  Qed.
-
-  #[global] Instance restrict_eutt {X} c : 
-      Proper (eutt eq ==> eutt eq) (@restrict X c).
-  Proof.
-    unfold restrict; do 2 red; intros * EQ; rewrite EQ; reflexivity.
-  Qed.
-
-  Lemma restrict_tau : forall {X} c P,
-    restrict c (Tau P) ≅ Tau (@restrict X c P).
-  Proof.
-    unfold restrict; intros; rewrite interp_tau; reflexivity.
-  Qed. 
-
-  Lemma restrict_act : forall {X} c P a,
-    use_channel c (Some a) = false ->
-    @restrict X c (act a;; P) ≈ act a;; restrict c P.
-  Proof.
-    unfold restrict, act; intros * NEQ.
-    rewrite interp_bind, interp_trigger.
-    cbn in *; destruct a; rewrite NEQ; reflexivity.
-  Qed. 
-
-  Lemma restrict_synch : forall {X} c P,
-    use_channel c None = false ->
-    @restrict X c (synch;; P) ≈ synch;; restrict c P.
-  Proof.
-    unfold restrict, synch; intros * NEQ.
-    rewrite interp_bind, interp_trigger.
-    reflexivity.
-  Qed. 
-
-  Lemma restrict_plus : forall c L R,
-    restrict c (plus L R) ≈ plus (restrict c L) (restrict c R).
-  Proof.
-    unfold restrict, plus; intros *.
-    rewrite interp_bind, interp_trigger.
-    cbn.
-    apply eutt_eq_bind; intros []; reflexivity.
-  Qed. 
-
-  Lemma restrict_branch2 : forall c L R,
-    restrict c (branch2 L R) ≈ branch2 (restrict c L) (restrict c R).
-  Proof.
-    unfold restrict, branch2; intros *.
-    rewrite interp_bind, interp_trigger.
-    cbn.
-    apply eutt_eq_bind; intros []; reflexivity.
-  Qed. 
-
-  Lemma restrict_branch3 : forall c L R S,
-    restrict c (branch3 L R S) ≈ branch3 (restrict c L) (restrict c R) (restrict c S).
-  Proof.
-    unfold restrict, branch3; intros *.
-    rewrite interp_bind, interp_trigger.
-    cbn.
-    apply eutt_eq_bind; intros []; reflexivity.
-  Qed. 
-
-  Lemma Restrict_sem_aux :
-    forall P a c P',
-      use_channel c a = false ->
-      P ⊢a→ccs P' ->
-      restrict c P ⊢a→ccs restrict c P'.
-  Proof.
-    intros * NEQ STEP.
-    induction STEP; rewrite H.
-    - rewrite restrict_act; auto.
-      constructor; reflexivity.
-    - rewrite restrict_synch; auto. 
-      constructor; reflexivity.
-    - rewrite restrict_plus.
-      eapply S_Plus_L; eauto. 
-      reflexivity.
-    - rewrite restrict_plus.
-      eapply S_Plus_R; eauto.
-      reflexivity.
-    - rewrite restrict_branch2.
-      eapply S_Sched2_L; [| reflexivity].
-      eauto. 
-    - rewrite restrict_branch2.
-      eapply S_Sched2_R; [| reflexivity].
-      eauto. 
-    - rewrite restrict_branch3.
-      eapply S_Sched3_L; [| reflexivity].
-      eauto. 
-    - rewrite restrict_branch3.
-      eapply S_Sched3_R; [| reflexivity].
-      eauto. 
-    - rewrite restrict_branch3.
-      eapply S_Sched3_S; [| reflexivity].
-      eauto. 
-  Qed.
-
-  Lemma Restrict_sem :
-    forall P a c P',
-      use_channel c a = false ->
-      P ⊢a→sem P' ->
-      P ∖ c ⊢a→sem P' ∖ c.
-  Proof.
-    intros * NEQ STEP.
-    apply Restrict_sem_aux; auto.
-  Qed.    
-
-  Theorem model_complete :
-    forall P a Q, 
-      P ⊢a→op Q ->
-      P ⊢a→sem Q.
-  Proof.
-    intros * StepOp.
-    (* Lock-step simulation *)
-    induction StepOp;
-      try now constructor.
-    + apply SumL_sem; assumption. 
-
-    + apply SumR_sem; assumption. 
-      
-    + apply ParL_sem; assumption. 
-
-    + apply ParR_sem; assumption. 
-    
-    + eapply ParS_sem; eassumption. 
-       
-    + (* Restrict *)
-      apply Restrict_sem; assumption.
-
-  Qed.
-
-  Definition stuck_ccs P := forall a Q, ~ P ⊢a→ccs Q.
-  
-  Lemma done_cannot_step : stuck_ccs done.
-  Proof.
-    red; unfold done; intros * STEP.
-    inv STEP.
-    all: match goal with 
-    | h : eutt _ (Ret _) _ |- _ =>  
-    eapply eutt_ret_trigger_abs, h 
-    end.
-  Qed.   
-
-  Ltac abs_eutt H := apply eqit_inv in H; inv H.
-  Ltac is_abs := 
-    match goal with 
-    | h : eutt _ _ _ |- _ => abs_eutt h 
-    end. 
-
-  (* Makes the canonization super-inefficient, might want to compute the liste of bound variables in one pass *)
-  Fixpoint use_channel_term (P : term) (c : chan) : bool :=
-    match P with 
-    | 0 => false 
-    | ↑ c' ⋅ P => (c =? c')%string || use_channel_term P c
-    | ↓ c' ⋅ P => (c =? c')%string || use_channel_term P c
-    | P ⊕ Q | P ∥ Q => use_channel_term P c || use_channel_term Q c
-    | P ∖ c' => use_channel_term P c
-    end.
-  Notation "c ∈ P" := (use_channel_term P c = true) (at level 80).
-  Notation "c ∉ P" := (use_channel_term P c = false) (at level 80).
-
-  Fixpoint canonize (P : term) : term :=
-    match P with 
-    | 0 => 0
-    | a ⋅ P => a ⋅ (canonize P)
-    | P ⊕ Q => canonize P ⊕ canonize Q
-    | P ∥ Q => canonize P ∥ canonize Q 
-    | P ∖ c => if use_channel_term P c then canonize P ∖ c else canonize P
-    end
-  .
-
-  Lemma restrict_done : forall c,
-    restrict c done ≅ done.
-  Proof.
-    intros; unfold restrict, done at 1; rewrite interp_ret; reflexivity.
-  Qed.
-
-  Ltac break_match_goal :=
-    match goal with
-    | [ |- context [ match ?X with _ => _ end ] ] =>
-      match type of X with
-      | sumbool _ _ => destruct X
-      | _ => destruct X eqn:?
-      end
-    end.
-
-  Ltac break_match_hyp h :=
-    match type of h with
-    | context [ match ?X with _ => _ end ] =>
-      match type of X with
-      | sumbool _ _ => destruct X
-      | _ => destruct X eqn:?
-      end
-    end.
-
-  Lemma fresh_channel_act : forall c a P,
-    c ∉ a ⋅ P -> 
-    use_channel c (Some a) = false /\ c ∉ P.
-  Proof.
-    cbn; intros * H; break_match_hyp H; subst; auto.
-    apply Bool.orb_false_elim in H; apply H.
-    apply Bool.orb_false_elim in H; apply H.
-  Qed.
-
-  Lemma fresh_channel_para : forall c P Q,
-    c ∉ P ∥ Q ->
-    c ∉ P /\ c ∉ Q.
-  Proof.
-    cbn; intros * H; apply Bool.orb_false_elim in H; apply H.
-  Qed.
-
-  Definition eq_head : head -> head -> Prop :=
-    fun h1 h2 =>
-      match h1,h2 with
-      | HDone, HDone => True
-      | HSynch t1, HSynch t2 => t1 ≈ t2
-      | HAct a1 t1, HAct a2 t2 => a1 = a2 /\ t1 ≈ t2
-      | _, _ => False
-      end.
-  Hint Unfold eq_head : core.
-
-  Global Instance get_hd_eutt : 
-    Proper (eutt eq ==> eutt eq_head) get_hd.
-  Proof.
-    do 2 red.
-    einit.
-    ecofix CIH.
-    intros * EQ.
-    punfold EQ.
-    setoid_rewrite get_hd_unfold.
-    induction EQ; try inv CHECK.
-    - estep; constructor; reflexivity.
-    - estep; pclearbot. constructor; auto with paco.
-    - pclearbot.
-      destruct e as [? | [? | [? | ?]]].
-      + estep; intros ?; ebase.
-      + destruct a; estep.
-      + destruct s; estep.
-      + estep.
-    - rewrite tau_euttge. 
-      rewrite get_hd_unfold.
-      apply IHEQ.
-    - rewrite tau_euttge. 
-      rewrite get_hd_unfold.
-      apply IHEQ.
-  Qed.
-
-  (* TODO Actually curate some utils *)
-  Ltac break_and := 
-    match goal with 
-    | h : _ /\ _ |- _ => destruct h 
-    end.
-
-  (* TODO Move to itrees *)
-  Lemma euttG_trigger :
-    forall {E : Type -> Type} {R1 R2 : Type} (RR : R1 -> R2 -> Prop)
-      (rH rL : itree E R1 -> itree E R2 -> Prop)
-      (gL : forall x : itree E R1, (fun _ : itree E R1 => itree E R2) x -> Prop)
-      (gH : itree E R1 -> itree E R2 -> Prop) (u : Type) 
-      (e : E u) (k1 : u -> itree E R1) (k2 : u -> itree E R2),
-    (forall v : u, euttG RR gH gH gH gH (k1 v) (k2 v)) ->
-    euttG RR rH rL gL gH (x <- trigger e;; k1 x) (x <- trigger e;; k2 x).
-  Proof.
-    intros.
-    rewrite 2 bind_trigger. 
-    apply euttG_vis; auto.
-  Qed.
-        
-  Ltac etrigger :=
-     repeat red; under_forall ltac:(eapply euttG_trigger; eauto with paco).
-
-  #[global] Instance para_eutt :
-    Proper (eutt eq ==> eutt eq ==> eutt eq) para.
-  Proof.
-    do 3 red.
-    einit; ecofix CIH.
-    intros P P' EQP Q Q' EQQ. 
-    rewrite 2 para_unfold.
-    ebind; econstructor.
-    apply get_hd_eutt; auto. 
-    intros uP1 uP2 EQHP.
-    ebind; econstructor.
-    apply get_hd_eutt; auto. 
-    intros uQ1 uQ2 EQHQ.
-    destruct uP1, uP2; cbn in EQHP; try now inversion EQHP; repeat break_and; subst.
-    all: destruct uQ1, uQ2; cbn in EQHQ; try (now inversion EQHQ); repeat break_and; subst.
-    all: try estep. 
-    all: try (unfold branch2; etrigger; intros []; estep).
-    break_match_goal.
-    unfold branch3; etrigger; intros []; estep.
-    unfold branch2; etrigger; intros []; estep.
-  Qed.
-    
-  #[global] Instance plus_eutt :
-    Proper (eutt eq ==> eutt eq ==> eutt eq) plus.
-  Proof.
-    intros P P' EQP Q Q' EQQ. 
-    unfold plus; apply eutt_eq_bind; intros []; auto.
-  Qed.
-
-  Lemma restrict_bind : forall {X} c (P : ccsT X) (K : X -> ccs),
-    restrict c (x <- P;; K x) ≅
-    x <- restrict c P;; restrict c (K x).
-  Proof.
-    unfold restrict; intros; rewrite interp_bind; reflexivity.
-  Qed.
-
-  Definition eq_head_restrict c : head -> head -> Prop :=
-    fun h1 h2 =>
-      match h1,h2 with
-      | HDone, HDone => True
-      | HSynch t1, HSynch t2 => restrict c t1 ≈ t2
-      | HAct a1 t1, HAct a2 t2 => a1 = a2 /\ restrict c t1 ≈ t2
-      | _, _ => False
-      end.
-  Hint Unfold eq_head_restrict : core.
-
-  (* We need to be careful to push into R the restriction over the 
-     remaining of the tree in the case where we take the head first
-  *)
-  Lemma restrict_get_hd : forall c P,
-    eutt (eq_head_restrict c) (restrict c (get_hd P)) (get_hd (restrict c P)).
-  Proof.
-    intros c.
-    einit; ecofix CIH; intros P.
-  Admitted.
-
-  Lemma restrict_para : forall c P Q,
-    restrict c (para P Q) ≈ para (restrict c P) (restrict c Q).
-  Proof.
-    intros c.
-    einit; ecofix CIH.
-    intros.
-    rewrite 2 para_unfold.
-    rewrite restrict_bind.
-    ebind; econstructor.
-    apply restrict_get_hd. 
-    intros hdP hdP' EQP.
-    rewrite restrict_bind.
-    ebind; econstructor.
-    apply restrict_get_hd.
-    intros hdQ hdQ' EQQ.
-    destruct hdP, hdP'; cbn in EQP; try now inversion EQP; repeat break_and; subst.
-    all: destruct hdQ, hdQ'; cbn in EQQ; try (now inversion EQQ); repeat break_and; subst.
-    rewrite restrict_done; reflexivity.
-    (* TODO: para should probably use [synch] rather than [vis Synch], that'd
-      simplify stuff *)
-    (* rewrite restrict_synch. *)
-  Admitted.
- 
-  Lemma restrict_dead : forall {X} c,
-      @restrict X c dead ≈ dead.
-  Proof.
-    intros; unfold restrict, dead. 
-    rewrite interp_bind, interp_trigger.
-    cbn; unfold h_trigger.
-    apply eutt_eq_bind; intros [].
-  Qed.
-
-  Lemma restrict_dead' : forall c,
-      interp (h_restrict c) (@dead unit _ _) ≈ dead.
-  Proof.
-    apply restrict_dead.
-  Qed.
- 
-  Lemma restrict_commut : forall {X} P c c',
-    @restrict X c (restrict c' P) ≈ restrict c' (restrict c P).
-  Proof.
-    intros; revert P.
-    einit.
-    ecofix CIH.
-    intros P.
-    rewrite (itree_eta P). 
-    unfold restrict. 
-    destruct (observe P).
-    - rewrite !interp_ret; eret.
-    - rewrite !interp_tau; etau.
-    - rewrite !interp_vis, !interp_bind.
-      ebind; apply pbc_intro_h with eq.
-      + destruct e as [| [| []]]; cbn; unfold h_trigger; cbn.
-        all: try (rewrite !interp_trigger; cbn;unfold h_trigger; cbn; reflexivity).
-        destruct a as [[|]]; cbn; repeat break_match_goal; cbn.
-        all: rewrite ?restrict_dead',?interp_trigger; cbn; rewrite ?Heqb,?Heqb0; reflexivity.
-      + intros ? ? ->.
-        rewrite !interp_tau.
-        etau.
-  Qed.
-    
-  Lemma restrict_unused_channel : forall P c,
-    c ∉ P ->
-    ⟦P ∖ c⟧ ≈ ⟦P⟧.
-  Proof.
-    intros *; induction P; intros NIN.
-    - cbn; rewrite restrict_done; reflexivity.
-    - apply fresh_channel_act in NIN as [? ?].
-      cbn; rewrite restrict_act; auto.
-      apply eutt_eq_bind; intros []; auto.
-    - cbn in *. rewrite restrict_para; auto.
-      apply fresh_channel_para in NIN as []; rewrite IHP1,IHP2; auto.
-      reflexivity.
-    - cbn in *. rewrite restrict_plus; auto.
-      apply fresh_channel_para in NIN as []; rewrite IHP1,IHP2; auto.
-      reflexivity.
-    - cbn in *.
-      rewrite restrict_commut, IHP; auto.
-      reflexivity.
-  Qed.
-
-  Lemma canonize_equivalence_class :
-    forall P Q, 
-      ⟦P⟧ ≈ ⟦Q⟧ <-> canonize P = canonize Q.
-  Proof.
-    intros *; split; intros EQ.
-    - admit.
-    - revert Q EQ.
-      induction P; cbn.
-      + induction Q; intros EQ; try now inversion EQ.
-        cbn in EQ. 
-        break_match_hyp EQ; [inv EQ |].
-        rewrite IHQ; auto. 
-        symmetry; apply restrict_unused_channel; auto.
-      + induction Q; cbn; intros EQ; try now inversion EQ.
-        inv EQ.
-        apply eutt_eq_bind; intros []; auto.
-        break_match_hyp EQ; [inv EQ |].
-        rewrite IHQ; auto. 
-        symmetry; apply restrict_unused_channel; auto.
-      + induction Q; cbn; intros EQ; try now inversion EQ.
-        inv EQ.
-  Abort.
-
-  Lemma act_sem_inv : forall a b P Q,
-    a ⋅ P ⊢b→sem Q ->
-    canonize Q = canonize P /\ b = Some a.
-  Proof.
-  Abort.
-
-  Theorem model_correct :
-    forall P a Q, 
-      P ⊢a→sem Q ->
-      P ⊢a→op Q.
-  Proof.
-    induction P; intros * STEP. 
-    - red in STEP. 
-      exfalso; eapply done_cannot_step; eauto.
-    - red in STEP.
-      cbn in STEP.
-  Admitted.
-
-  Theorem model_correct_complete :
-    forall P, bisim P P.
-  Proof.
-    pcofix CIH.
-    intros P.
-    pfold.
-    econstructor.
-    split.
-
-    - (* The denotational side can simulate the operational semantics *)
-      intros a P' StepOp.
-      exists P'.
-      split; [| right; auto].
-      clear CIH r.
-      apply model_complete; auto.
-
-    - (* The operational side can simulate the denotational semantics *)
-      intros a P' StepSem.
-      exists P'; split; [| auto].
-      apply model_correct; auto.
-
-  Qed.
-
-  (* BEGIN PROOFS IN PROGRESS FOR THE ADMITTED LEMMAS ABOVE *)
-
-  Definition eq_head' R : head -> head -> Prop :=
-    fun h1 h2 =>
-      match h1,h2 with
-      | HDone, HDone => True
-      | HSynch t1, HSynch t2 => eq_itree R t1 t2
-      | HAct a1 t1, HAct a2 t2 => a1 = a2 /\ eq_itree R t1 t2
-      | _, _ => False
-      end.
-  Hint Unfold eq_head' : core.
-
-  Global Instance get_hd_eq_itree {R} :
-    Proper (eq_itree R ==> eq_itree (eq_head' R)) get_hd.
-  Proof.
-    do 2 red.
-    ginit.
-    gcofix CIH.
-    intros * EQ.
-    punfold EQ.
-    setoid_rewrite get_hd_unfold.
-    induction EQ; try inv CHECK.
-    - gstep; constructor; reflexivity.
-    - gstep; pclearbot. constructor; auto with paco.
-    - gstep; pclearbot.
-      destruct e as [? | [? | [? | ?]]].
-      + constructor; red; auto with paco.
-      + destruct a; constructor; auto.
-      + destruct s; constructor; auto.
-      + constructor; auto.
-  Qed.
-
-  Lemma FST_means_Finite {X}: forall (P: itree ccsE X), FiniteSchedTree P -> Finite P.
-  Proof.
-    intros.
-    induction H.
-    - now apply FRet with R x.
-    - now apply FTau with R P.
-    - rewrite bind_trigger in H.
-      eapply FVis;
-        eauto.
-    - rewrite bind_trigger in H.
-      eapply FVis;
-        eauto.
-    - rewrite bind_trigger in H.
-      eapply FVis;
-        eauto.
-  Qed.
-
   Global Instance Finite_eq_itree {E X} R :
     Proper (eq_itree R ==> flip impl) (@Finite E X).
   Proof.
@@ -989,14 +365,134 @@ Section EquivSem.
       + assumption.
   Qed.
 
-  Theorem finite_head : forall P, Finite P -> FiniteSchedTree (get_hd P).
+  Definition eq_head R : head -> head -> Prop :=
+    fun h1 h2 =>
+      match h1,h2 with
+      | HDone, HDone => True
+      | HSynch t1, HSynch t2 => eq_itree R t1 t2
+      | HAct a1 t1, HAct a2 t2 => a1 = a2 /\ eq_itree R t1 t2
+      | _, _ => False
+      end.
+  Hint Unfold eq_head : core.
+
+  Global Instance get_hd_eq_itree {R} :
+    Proper (eq_itree R ==> eq_itree (eq_head R)) get_hd.
+  Proof.
+    do 2 red.
+    ginit.
+    gcofix CIH.
+    intros * EQ.
+    punfold EQ.
+    setoid_rewrite get_hd_unfold.
+    induction EQ; try inv CHECK.
+    - gstep; constructor; reflexivity.
+    - gstep; pclearbot. constructor; auto with paco.
+    - gstep; pclearbot.
+      destruct e as [? | [? | [? | ?]]].
+      + constructor; red; auto with paco.
+      + destruct a; constructor; auto.
+      + destruct s; constructor; auto.
+      + constructor; auto.
+  Qed.
+
+  Lemma step_ccs_through_FST :
+    forall (t : ccsT head) (k : head -> ccs) (q : ccs) a hd,
+      FiniteSchedTree t ->
+      Returns_legacy hd t ->
+      k hd ⊢ a →ccs q ->
+      (hd <- t;; k hd) ⊢ a →ccs q.
+  Proof.
+    intros * Fin.
+    induction Fin;
+      intros.
+    - inversion H0; subst.
+      + apply eqitree_inv_Ret_r in H2 as [r [EqR Eq]].
+        rewrite unfold_bind, Eq, EqR.
+        assumption.
+      + apply eqitree_inv_Tau_r in H2 as [t' [Eq1 _]].
+        apply eqitree_inv_Ret_r in H as [r [_ Eq2]].
+        rewrite Eq1 in Eq2.
+        discriminate.
+      + apply eqitree_inv_Ret_r in H as [r [_ Eq1]].
+        apply eqitree_inv_Vis_r in H2 as [k' [Eq2 _]].
+        rewrite Eq1 in Eq2.
+        discriminate.
+    - inversion H0; subst.
+      + apply eqitree_inv_Ret_r in H2 as [r [EqR Eq]].
+        rewrite unfold_bind, Eq, EqR.
+        assumption.
+      + apply eqitree_inv_Tau_r in H as [t' [Eq1 Cong]].
+        apply eqitree_inv_Tau_r in H2 as [t'' [Eq2 Cong']].
+        rewrite Eq1 in Eq2.
+        rewrite unfold_bind, Eq1, tau_eutt.
+        (* rewrite Cong.
+           missing Proper eq_itree R | bind or step?
+         *)
+        admit.
+      + apply eqitree_inv_Tau_r in H as [r [Eq1 _]].
+        apply eqitree_inv_Vis_r in H2 as [k' [Eq2 ]].
+        rewrite Eq1 in Eq2.
+        discriminate.
+    - rewrite bind_trigger in H.
+      apply eqitree_inv_Vis_r in H as [k' [Eq1 RR]].
+      inversion H2; subst.
+      + apply eqitree_inv_Ret_r in H as [r [_ Eq2]].
+        rewrite Eq1 in Eq2.
+        discriminate.
+      + apply eqitree_inv_Tau_r in H as [r [Eq2 _]].
+        rewrite Eq1 in Eq2.
+        discriminate.
+      + apply eqitree_inv_Vis_r in H as [k'' [Eq2 RR']].
+        rewrite Eq1 in Eq2.
+        (* need to prove that k' = k'' = k0 = k1 *)
+        admit.
+  Admitted.
+
+  Lemma step_ccs_through_FST_weak :
+    forall (t : ccsT head) (k : head -> ccs) (q : ccs) a,
+      FiniteSchedTree t ->
+      (forall hd, k hd ⊢ a →ccs q) ->
+      (hd <- t;; k hd) ⊢ a →ccs q.
+  Proof.
+    intros.
+    revert k q a H0.
+    induction H;
+      intros.
+    - apply eqitree_inv_Ret_r in H as [r' [_ Eq]].
+      now rewrite unfold_bind, Eq.
+    - apply eqitree_inv_Tau_r in H as [t0 [Eq Rel]].
+      rewrite unfold_bind, Eq.
+      rewrite tau_eutt.
+      apply IHFiniteSchedTree in H1.
+      (* now rewrite Rel.
+       * missing Proper eq_itree R | bind or step_ccs?
+       *)
+  Admitted.
+
+  Lemma step_ccs_is_returned_by_get_hd :
+    forall (p q : ccs) a,
+      p ⊢ a →ccs q ->
+      Returns_legacy (head_of_action a q) (get_hd p).
+  Proof.
+    intros.
+    induction H.
+    - pose proof (get_hd_unfold (act a;; P)) as Eq;
+        cbn in Eq.
+      apply Returns_legacyRet.
+      unfold head_of_action.
+      
+  Admitted.
+
+  Lemma finite_head : forall (P : ccs),
+    Finite P ->
+    FiniteSchedTree (get_hd P).
   Proof.
     intros.
     induction H.
     - (* Ret *)
       pose proof (get_hd_unfold (Ret x)) as Eq;
         cbn in Eq.
-      apply FSTRet with (eq_head' R) HDone.
+      apply FSTRet with (eq_head R) HDone.
       apply get_hd_eq_itree in H.
       now rewrite Eq in H.
     - (* Tau *)
@@ -1022,9 +518,9 @@ Section EquivSem.
   Lemma finite_bind {E X Y} : forall (t: itree E Y) (k: Y -> itree E X),
       Finite t -> (forall y, Finite (k y)) -> Finite (y <- t;; k y).
   Proof.
-    intros t k Fin.
+    intros * Fin.
     induction Fin;
-      intros FinK.
+      intro FinK.
     - apply eqitree_inv_Ret_r in H as [r' [_ Eq]].
       now rewrite unfold_bind, Eq.
     - apply eqitree_inv_Tau_r in H as [t' [Eq Rel]].
@@ -1032,6 +528,9 @@ Section EquivSem.
       eapply FTau.
       + reflexivity.
       + apply IHFin in FinK.
+        (* now rewrite Rel.
+           missing Proper eq_itree R | Finite or bind?
+         *)
         admit.
     - apply eqitree_inv_Vis_r in H as [k' [Eq Rel]].
       rewrite unfold_bind, Eq.
@@ -1040,8 +539,28 @@ Section EquivSem.
       + cbn.
         intros.
         apply H1 with x in FinK.
+        (* now rewrite Rel.
+           missing Proper eq_itree R | Finite or bind?
+         *)
         admit.
   Admitted.
+
+  Lemma FST_means_Finite {X}: forall (P: itree ccsE X), FiniteSchedTree P -> Finite P.
+  Proof.
+    intros.
+    induction H.
+    - now apply FRet with R x.
+    - now apply FTau with R P.
+    - rewrite bind_trigger in H.
+      eapply FVis;
+        eauto.
+    - rewrite bind_trigger in H.
+      eapply FVis;
+        eauto.
+    - rewrite bind_trigger in H.
+      eapply FVis;
+        eauto.
+  Qed.
 
   Lemma finite_interp {E F X} : forall (h : Handler E F) (t : itree E X),
       Finite t ->
@@ -1064,6 +583,9 @@ Section EquivSem.
       apply FTau with eq (interp h t').
       + reflexivity.
       + apply IHFinT in H0.
+        (* now rewrite Rel.
+           missing Proper eq_itree R | Finite or interp?
+         *)
         admit.
     - apply eqitree_inv_Vis_r in H as [k' [Eq Rel]].
       rewrite unfold_interp;
@@ -1075,23 +597,26 @@ Section EquivSem.
         apply FTau with eq (interp h (k' y)).
         * reflexivity.
         * apply H1 with (x := y) in H2.
+          (* rewrite Rel.
+             missing Proper eq_itree R | Finite or interp?
+           *)
           admit.
   Admitted.
 
-(* In order to prove that : [forall P, finite (model P)],
-    we need to reason about the co-recursive call performed by para.
-    However, this call does not take place on immediately structurally smaller
-    arguments, whether on the syntactic level via model nor on the trees themselves.
-    One sensible first step is to introduce an intermediate result on [para]:
-    [forall t s, Finite t -> Finite s -> Finite (para t s)]
-    As mentionned above however, this is still not the panacea: [Finite] essentially
-    gives structural induction on your tree, but the call is still not structural.
-    Hence we probably need to introduce the size of finite trees and proceed by
-    strong induction on the sum of the sizes of both trees, which requires quite
-    a bit of boilerplate and work.
-*)
-
-  Theorem finite_model : forall P, Finite (model P).
+  (* In order to prove that : [forall P, finite (model P)],
+     we need to reason about the co-recursive call performed by para.
+     However, this call does not take place on immediately structurally smaller
+     arguments, whether on the syntactic level via model nor on the trees themselves.
+     One sensible first step is to introduce an intermediate result on [para]:
+     [forall t s, Finite t -> Finite s -> Finite (para t s)]
+     As mentionned above however, this is still not the panacea: [Finite] essentially
+     gives structural induction on your tree, but the call is still not structural.
+     Hence we probably need to introduce the size of finite trees and proceed by
+     strong induction on the sum of the sizes of both trees, which requires quite
+     a bit of boilerplate and work.
+   *)
+  Lemma finite_model : forall (P : term),
+      Finite ⟦P⟧.
   Proof.
     induction P;
       cbn.
@@ -1114,7 +639,7 @@ Section EquivSem.
         * intro rQ.
           destruct rP, rQ;
             try assumption.
-          -- now apply FRet with eq tt. 
+          -- now apply FRet with eq tt.
           -- admit.
           -- admit.
           -- admit.
@@ -1151,36 +676,552 @@ Section EquivSem.
       + admit.
   Admitted.
 
+
+  Lemma op_involutive : forall a, op (op a) = a.
+  Proof.
+    intros []; reflexivity.
+  Qed.
+
+  Lemma SumL_sem :
+    forall P a Q P',
+      P ⊢a→sem P' ->
+      P ⊕ Q ⊢a→sem P'.
+  Proof.
+    intros.
+    apply S_Plus_L with ⟦P⟧ ⟦Q⟧; auto; reflexivity.
+  Qed.
+
+  Lemma SumR_sem :
+    forall P a Q Q',
+      Q ⊢a→sem Q' ->
+      P ⊕ Q ⊢a→sem Q'.
+  Proof.
+    intros.
+    apply S_Plus_R with ⟦P⟧ ⟦Q⟧; auto; reflexivity.
+  Qed.
+
+ Lemma ParL_sem :
+    forall P a Q P',
+      P ⊢a→sem P' ->
+      P ∥ Q ⊢a→sem P' ∥ Q.
+  Proof.
+    intros * STEP.
+    unfold step_sem in *.
+    cbn.
+    rewrite para_unfold.
+    apply step_ccs_through_FST with (head_of_action a ⟦P'⟧).
+    3:apply step_ccs_through_FST_weak.
+    * apply finite_head, finite_model.
+    * apply step_ccs_is_returned_by_get_hd; assumption.
+    * apply finite_head, finite_model.
+    * intros hd.
+      destruct hd eqn:EQHD, a eqn:EQa; cbn;
+        try (constructor; unfold act,synch; rewrite bind_trigger; reflexivity);
+        try (eapply S_Sched2_L; [constructor; unfold act,synch; rewrite bind_trigger; reflexivity | reflexivity]).
+        destruct (are_opposite a1 a0).
+        eapply S_Sched3_L; [constructor; unfold act; rewrite bind_trigger; reflexivity | reflexivity].
+        eapply S_Sched2_L; [constructor; unfold act; rewrite bind_trigger; reflexivity | reflexivity].
+  Qed.
+
+  Lemma ParR_sem :
+    forall P a Q Q',
+      Q ⊢a→sem Q' ->
+      P ∥ Q ⊢a→sem P ∥ Q'.
+  Proof.
+    intros * STEP.
+    unfold step_sem in *.
+    cbn.
+    rewrite para_unfold.
+    apply step_ccs_through_FST_weak.
+    2:intros; apply step_ccs_through_FST with (head_of_action a ⟦Q'⟧).
+    * apply finite_head, finite_model.
+    * apply finite_head, finite_model.
+    * apply step_ccs_is_returned_by_get_hd; assumption.
+    * destruct hd eqn:EQHD, a eqn:EQa; cbn;
+        try (constructor; unfold act,synch; rewrite bind_trigger; reflexivity);
+        try (eapply S_Sched2_R; [constructor; unfold act,synch; rewrite bind_trigger; reflexivity | reflexivity]).
+        destruct (are_opposite a0 a1).
+        eapply S_Sched3_R; [constructor; unfold act,synch; rewrite bind_trigger; reflexivity | reflexivity].
+        eapply S_Sched2_R; [constructor; unfold act,synch; rewrite bind_trigger; reflexivity | reflexivity].
+  Qed.
+
+  Lemma ParS_sem :
+    forall P a Q P' Q',
+      P ⊢Some a→sem P' ->
+      Q ⊢Some (op a)→sem Q' ->
+      P ∥ Q ⊢None→sem P' ∥ Q'.
+  Proof.
+    intros * STEP_P STEP_Q.
+    unfold step_sem in *.
+    cbn.
+    rewrite para_unfold.
+    apply step_ccs_through_FST with (head_of_action (Some a) ⟦P'⟧).
+    3:apply step_ccs_through_FST with (head_of_action (Some (op a)) ⟦Q'⟧).
+    * apply finite_head, finite_model.
+    * apply step_ccs_is_returned_by_get_hd; assumption.
+    * apply finite_head, finite_model.
+    * apply step_ccs_is_returned_by_get_hd; assumption.
+    * cbn.
+      unfold are_opposite.
+      rewrite op_involutive, eqb_action_refl.
+      eapply S_Sched3_S; [constructor; unfold synch; rewrite bind_trigger; reflexivity | reflexivity].
+  Qed.
+
+  #[global] Instance restrict_eq_itree {X} c : 
+      Proper (eq_itree eq ==> eq_itree eq) (@restrict X c).
+  Proof.
+    unfold restrict; do 2 red; intros * EQ; rewrite EQ; reflexivity.
+  Qed.
+
+  #[global] Instance restrict_eutt {X} c : 
+      Proper (eutt eq ==> eutt eq) (@restrict X c).
+  Proof.
+    unfold restrict; do 2 red; intros * EQ; rewrite EQ; reflexivity.
+  Qed.
+
+  Lemma restrict_tau : forall {X} c P,
+    restrict c (Tau P) ≅ Tau (@restrict X c P).
+  Proof.
+    unfold restrict; intros; rewrite interp_tau; reflexivity.
+  Qed.
+
+  Lemma restrict_act : forall {X} c P a,
+    use_channel c (Some a) = false ->
+    @restrict X c (act a;; P) ≈ act a;; restrict c P.
+  Proof.
+    unfold restrict, act; intros * NEQ.
+    rewrite interp_bind, interp_trigger.
+    cbn in *; destruct a; rewrite NEQ; reflexivity.
+  Qed.
+
+  Lemma restrict_synch : forall {X} c P,
+    use_channel c None = false ->
+    @restrict X c (synch;; P) ≈ synch;; restrict c P.
+  Proof.
+    unfold restrict, synch; intros * NEQ.
+    rewrite interp_bind, interp_trigger.
+    reflexivity.
+  Qed.
+
+  Lemma restrict_plus : forall c L R,
+    restrict c (plus L R) ≈ plus (restrict c L) (restrict c R).
+  Proof.
+    unfold restrict, plus; intros *.
+    rewrite interp_bind, interp_trigger.
+    cbn.
+    apply eutt_eq_bind; intros []; reflexivity.
+  Qed.
+
+  Lemma restrict_branch2 : forall c L R,
+    restrict c (branch2 L R) ≈ branch2 (restrict c L) (restrict c R).
+  Proof.
+    unfold restrict, branch2; intros *.
+    rewrite interp_bind, interp_trigger.
+    cbn.
+    apply eutt_eq_bind; intros []; reflexivity.
+  Qed.
+
+  Lemma restrict_branch3 : forall c L R S,
+    restrict c (branch3 L R S) ≈ branch3 (restrict c L) (restrict c R) (restrict c S).
+  Proof.
+    unfold restrict, branch3; intros *.
+    rewrite interp_bind, interp_trigger.
+    cbn.
+    apply eutt_eq_bind; intros []; reflexivity.
+  Qed.
+
+  Lemma Restrict_sem_aux :
+    forall P a c P',
+      use_channel c a = false ->
+      P ⊢a→ccs P' ->
+      restrict c P ⊢a→ccs restrict c P'.
+  Proof.
+    intros * NEQ STEP.
+    induction STEP; rewrite H.
+    - rewrite restrict_act; auto.
+      constructor; reflexivity.
+    - rewrite restrict_synch; auto.
+      constructor; reflexivity.
+    - rewrite restrict_plus.
+      eapply S_Plus_L; eauto.
+      reflexivity.
+    - rewrite restrict_plus.
+      eapply S_Plus_R; eauto.
+      reflexivity.
+    - rewrite restrict_branch2.
+      eapply S_Sched2_L; [| reflexivity].
+      eauto.
+    - rewrite restrict_branch2.
+      eapply S_Sched2_R; [| reflexivity].
+      eauto.
+    - rewrite restrict_branch3.
+      eapply S_Sched3_L; [| reflexivity].
+      eauto.
+    - rewrite restrict_branch3.
+      eapply S_Sched3_R; [| reflexivity].
+      eauto.
+    - rewrite restrict_branch3.
+      eapply S_Sched3_S; [| reflexivity].
+      eauto.
+  Qed.
+
+  Lemma Restrict_sem :
+    forall P a c P',
+      use_channel c a = false ->
+      P ⊢a→sem P' ->
+      P ∖ c ⊢a→sem P' ∖ c.
+  Proof.
+    intros * NEQ STEP.
+    apply Restrict_sem_aux; auto.
+  Qed.
+
+  Theorem model_complete :
+    forall P a Q,
+      P ⊢a→op Q ->
+      P ⊢a→sem Q.
+  Proof.
+    intros * StepOp.
+    (* Lock-step simulation *)
+    induction StepOp;
+      try now constructor.
+    + apply SumL_sem; assumption.
+    + apply SumR_sem; assumption.
+    + apply ParL_sem; assumption.
+    + apply ParR_sem; assumption.
+    + eapply ParS_sem; eassumption.
+    + apply Restrict_sem; assumption.
+  Qed.
+
+  Definition stuck_ccs P := forall a Q, ~ P ⊢a→ccs Q.
+
+  Lemma done_cannot_step : stuck_ccs done.
+  Proof.
+    red; unfold done; intros * STEP.
+    inv STEP.
+    all: match goal with
+         | h : eutt _ (Ret _) _ |- _ =>
+           eapply eutt_ret_trigger_abs, h
+         end.
+  Qed.
+
+  Ltac abs_eutt H := apply eqit_inv in H; inv H.
+  Ltac is_abs :=
+    match goal with
+    | h : eutt _ _ _ |- _ => abs_eutt h
+    end.
+
+  (* Makes the canonization super-inefficient, might want to compute the liste of bound variables in one pass *)
+  Fixpoint use_channel_term (P : term) (c : chan) : bool :=
+    match P with
+    | 0 => false
+    | ↑ c' ⋅ P => (c =? c')%string || use_channel_term P c
+    | ↓ c' ⋅ P => (c =? c')%string || use_channel_term P c
+    | P ⊕ Q | P ∥ Q => use_channel_term P c || use_channel_term Q c
+    | P ∖ c' => use_channel_term P c
+    end.
+  Notation "c ∈ P" := (use_channel_term P c = true) (at level 80).
+  Notation "c ∉ P" := (use_channel_term P c = false) (at level 80).
+
+  Fixpoint canonize (P : term) : term :=
+    match P with
+    | 0 => 0
+    | a ⋅ P => a ⋅ (canonize P)
+    | P ⊕ Q => canonize P ⊕ canonize Q
+    | P ∥ Q => canonize P ∥ canonize Q
+    | P ∖ c => if use_channel_term P c then canonize P ∖ c else canonize P
+    end
+  .
+
+  Lemma restrict_done : forall c,
+    restrict c done ≅ done.
+  Proof.
+    intros; unfold restrict, done at 1; rewrite interp_ret; reflexivity.
+  Qed.
+
+  Lemma fresh_channel_act : forall c a P,
+    c ∉ a ⋅ P ->
+    use_channel c (Some a) = false /\ c ∉ P.
+  Proof.
+    cbn; intros * H; break_match_hyp H; subst; auto.
+    apply Bool.orb_false_elim in H; apply H.
+    apply Bool.orb_false_elim in H; apply H.
+  Qed.
+
+  Lemma fresh_channel_para : forall c P Q,
+    c ∉ P ∥ Q ->
+    c ∉ P /\ c ∉ Q.
+  Proof.
+    cbn; intros * H; apply Bool.orb_false_elim in H; apply H.
+  Qed.
+
+  (* Specialization of eq_head: needs to be cleaned up *)
+  Definition eq_head' : head -> head -> Prop :=
+    fun h1 h2 =>
+      match h1,h2 with
+      | HDone, HDone => True
+      | HSynch t1, HSynch t2 => t1 ≈ t2
+      | HAct a1 t1, HAct a2 t2 => a1 = a2 /\ t1 ≈ t2
+      | _, _ => False
+      end.
+  Hint Unfold eq_head' : core.
+
+  Global Instance get_hd_eutt : 
+    Proper (eutt eq ==> eutt eq_head') get_hd.
+  Proof.
+    do 2 red.
+    einit.
+    ecofix CIH.
+    intros * EQ.
+    punfold EQ.
+    setoid_rewrite get_hd_unfold.
+    induction EQ; try inv CHECK.
+    - estep; constructor; reflexivity.
+    - estep; pclearbot. constructor; auto with paco.
+    - pclearbot.
+      destruct e as [? | [? | [? | ?]]].
+      + estep; intros ?; ebase.
+      + destruct a; estep.
+      + destruct s; estep.
+      + estep.
+    - rewrite tau_euttge.
+      rewrite get_hd_unfold.
+      apply IHEQ.
+    - rewrite tau_euttge.
+      rewrite get_hd_unfold.
+      apply IHEQ.
+  Qed.
+
+  (* TODO Actually curate some utils *)
+  Ltac break_and :=
+    match goal with
+    | h : _ /\ _ |- _ => destruct h
+    end.
+
+  (* TODO Move to itrees *)
+  Lemma euttG_trigger :
+    forall {E : Type -> Type} {R1 R2 : Type} (RR : R1 -> R2 -> Prop)
+      (rH rL : itree E R1 -> itree E R2 -> Prop)
+      (gL : forall x : itree E R1, (fun _ : itree E R1 => itree E R2) x -> Prop)
+      (gH : itree E R1 -> itree E R2 -> Prop) (u : Type)
+      (e : E u) (k1 : u -> itree E R1) (k2 : u -> itree E R2),
+    (forall v : u, euttG RR gH gH gH gH (k1 v) (k2 v)) ->
+    euttG RR rH rL gL gH (x <- trigger e;; k1 x) (x <- trigger e;; k2 x).
+  Proof.
+    intros.
+    rewrite 2 bind_trigger.
+    apply euttG_vis; auto.
+  Qed.
+
+  Ltac etrigger :=
+     repeat red; under_forall ltac:(eapply euttG_trigger; eauto with paco).
+
+  #[global] Instance para_eutt :
+    Proper (eutt eq ==> eutt eq ==> eutt eq) para.
+  Proof.
+    do 3 red.
+    einit; ecofix CIH.
+    intros P P' EQP Q Q' EQQ.
+    rewrite 2 para_unfold.
+    ebind; econstructor.
+    apply get_hd_eutt; auto. 
+    intros uP1 uP2 EQHP.
+    ebind; econstructor.
+    apply get_hd_eutt; auto. 
+    intros uQ1 uQ2 EQHQ.
+    destruct uP1, uP2; cbn in EQHP; try now inversion EQHP; repeat break_and; subst.
+    all: destruct uQ1, uQ2; cbn in EQHQ; try (now inversion EQHQ); repeat break_and; subst.
+    all: try estep.
+    all: try (unfold branch2; etrigger; intros []; estep).
+    break_match_goal.
+    unfold branch3; etrigger; intros []; estep.
+    unfold branch2; etrigger; intros []; estep.
+  Qed.
+
+  #[global] Instance plus_eutt :
+    Proper (eutt eq ==> eutt eq ==> eutt eq) plus.
+  Proof.
+    intros P P' EQP Q Q' EQQ.
+    unfold plus; apply eutt_eq_bind; intros []; auto.
+  Qed.
+
+  Lemma restrict_bind : forall {X} c (P : ccsT X) (K : X -> ccs),
+    restrict c (x <- P;; K x) ≅
+    x <- restrict c P;; restrict c (K x).
+  Proof.
+    unfold restrict; intros; rewrite interp_bind; reflexivity.
+  Qed.
+
+  Definition eq_head_restrict c : head -> head -> Prop :=
+    fun h1 h2 =>
+      match h1,h2 with
+      | HDone, HDone => True
+      | HSynch t1, HSynch t2 => restrict c t1 ≈ t2
+      | HAct a1 t1, HAct a2 t2 => a1 = a2 /\ restrict c t1 ≈ t2
+      | _, _ => False
+      end.
+  Hint Unfold eq_head_restrict : core.
+
+  (* We need to be careful to push into R the restriction over the 
+     remaining of the tree in the case where we take the head first
+  *)
+  Lemma restrict_get_hd : forall c P,
+    eutt (eq_head_restrict c) (restrict c (get_hd P)) (get_hd (restrict c P)).
+  Proof.
+    intros c.
+    einit; ecofix CIH; intros P.
+  Admitted.
+
+  Lemma restrict_para : forall c P Q,
+    restrict c (para P Q) ≈ para (restrict c P) (restrict c Q).
+  Proof.
+    intros c.
+    einit; ecofix CIH.
+    intros.
+    rewrite 2 para_unfold.
+    rewrite restrict_bind.
+    ebind; econstructor.
+    apply restrict_get_hd. 
+    intros hdP hdP' EQP.
+    rewrite restrict_bind.
+    ebind; econstructor.
+    apply restrict_get_hd.
+    intros hdQ hdQ' EQQ.
+    destruct hdP, hdP'; cbn in EQP; try now inversion EQP; repeat break_and; subst.
+    all: destruct hdQ, hdQ'; cbn in EQQ; try (now inversion EQQ); repeat break_and; subst.
+    rewrite restrict_done; reflexivity.
+    (* TODO: para should probably use [synch] rather than [vis Synch], that'd
+      simplify stuff *)
+    (* rewrite restrict_synch. *)
+  Admitted.
+ 
+  Lemma restrict_dead : forall {X} c,
+      @restrict X c dead ≈ dead.
+  Proof.
+    intros; unfold restrict, dead.
+    rewrite interp_bind, interp_trigger.
+    cbn; unfold h_trigger.
+    apply eutt_eq_bind; intros [].
+  Qed.
+
+  Lemma restrict_dead' : forall c,
+      interp (h_restrict c) (@dead unit _ _) ≈ dead.
+  Proof.
+    apply restrict_dead.
+  Qed.
+ 
+  Lemma restrict_commut : forall {X} P c c',
+    @restrict X c (restrict c' P) ≈ restrict c' (restrict c P).
+  Proof.
+    intros; revert P.
+    einit.
+    ecofix CIH.
+    intros P.
+    rewrite (itree_eta P).
+    unfold restrict.
+    destruct (observe P).
+    - rewrite !interp_ret; eret.
+    - rewrite !interp_tau; etau.
+    - rewrite !interp_vis, !interp_bind.
+      ebind; apply pbc_intro_h with eq.
+      + destruct e as [| [| []]]; cbn; unfold h_trigger; cbn.
+        all: try (rewrite !interp_trigger; cbn;unfold h_trigger; cbn; reflexivity).
+        destruct a as [[|]]; cbn; repeat break_match_goal; cbn.
+        all: rewrite ?restrict_dead',?interp_trigger; cbn; rewrite ?Heqb,?Heqb0; reflexivity.
+      + intros ? ? ->.
+        rewrite !interp_tau.
+        etau.
+  Qed.
+
+  Lemma restrict_unused_channel : forall P c,
+    c ∉ P ->
+    ⟦P ∖ c⟧ ≈ ⟦P⟧.
+  Proof.
+    intros *; induction P; intros NIN.
+    - cbn; rewrite restrict_done; reflexivity.
+    - apply fresh_channel_act in NIN as [? ?].
+      cbn; rewrite restrict_act; auto.
+      apply eutt_eq_bind; intros []; auto.
+    - cbn in *. rewrite restrict_para; auto.
+      apply fresh_channel_para in NIN as []; rewrite IHP1,IHP2; auto.
+      reflexivity.
+    - cbn in *. rewrite restrict_plus; auto.
+      apply fresh_channel_para in NIN as []; rewrite IHP1,IHP2; auto.
+      reflexivity.
+    - cbn in *.
+      rewrite restrict_commut, IHP; auto.
+      reflexivity.
+  Qed.
+
+  Lemma canonize_equivalence_class :
+    forall P Q,
+      ⟦P⟧ ≈ ⟦Q⟧ <-> canonize P = canonize Q.
+  Proof.
+    intros *; split; intros EQ.
+    - admit.
+    - revert Q EQ.
+      induction P; cbn.
+      + induction Q; intros EQ; try now inversion EQ.
+        cbn in EQ.
+        break_match_hyp EQ; [inv EQ |].
+        rewrite IHQ; auto.
+        symmetry; apply restrict_unused_channel; auto.
+      + induction Q; cbn; intros EQ; try now inversion EQ.
+        inv EQ.
+        apply eutt_eq_bind; intros []; auto.
+        break_match_hyp EQ; [inv EQ |].
+        rewrite IHQ; auto.
+        symmetry; apply restrict_unused_channel; auto.
+      + induction Q; cbn; intros EQ; try now inversion EQ.
+        inv EQ.
+  Abort.
+
+  Lemma act_sem_inv : forall a b P Q,
+    a ⋅ P ⊢b→sem Q ->
+    canonize Q = canonize P /\ b = Some a.
+  Proof.
+  Abort.
+
+  Theorem model_correct :
+    forall P a Q,
+      P ⊢a→sem Q ->
+      P ⊢a→op Q.
+  Proof.
+    induction P; intros * STEP.
+    - red in STEP.
+      exfalso; eapply done_cannot_step; eauto.
+    - red in STEP.
+      cbn in STEP.
+  Admitted.
+
+  Theorem model_correct_complete :
+    forall P, bisim P P.
+  Proof.
+    pcofix CIH.
+    intros P.
+    pfold.
+    econstructor.
+    split.
+
+    - (* The denotational side can simulate the operational semantics *)
+      intros a P' StepOp.
+      exists P'.
+      split; [| right; auto].
+      clear CIH r.
+      apply model_complete; auto.
+
+    - (* The operational side can simulate the denotational semantics *)
+      intros a P' StepSem.
+      exists P'; split; [| auto].
+      apply model_correct; auto.
+
+  Qed.
+
+  (* BEGIN PROOFS IN PROGRESS FOR THE ADMITTED LEMMAS ABOVE *)
+
   Lemma get_hd_FST : forall P, FiniteSchedTree (get_hd (model P)).
   Proof.
     intros; eapply finite_head, finite_model.
   Qed.
-
-  Lemma FST_prefix_can_step {X} : forall (t : ccsT X) (k : X -> ccs) a t',
-      FiniteSchedTree t ->
-      (forall x, step_ccs (k x) a t') ->
-      step_ccs (x <- t;; k x) a t'.
-  Proof.
-    intros.
-    induction H.
-    - apply eqitree_inv_Ret_r in H as [r' [_ Eq]].
-      now rewrite unfold_bind, Eq.
-    - apply eqitree_inv_Tau_r in H as [t0 [Eq Rel]].
-      rewrite unfold_bind, Eq.
-      rewrite tau_eutt.
-  Admitted.
-
-  Theorem step_ccs_get_hd_returns : forall P a P',
-      step_ccs P a P'
-      ->
-      Returns_legacy (head_of_action a P') (get_hd P).
-  Proof.
-    intros.
-    induction H.
-    - pose proof (get_hd_unfold (Tau P)) as Eq;
-        cbn in Eq.
-      (* rewrite <- H0 in Eq. *)
-  Admitted.
 
   Theorem get_hd_means_step_deprecated : forall P a P',
       Returns_legacy (head_of_action a P') (get_hd P)
@@ -1218,49 +1259,49 @@ Section EquivSem.
           destruct EQ as [<- EQ].
           constructor.
           unfold act; rewrite bind_trigger; apply eqit_Vis; intros [].
-          symmetry; auto. 
-          (*
-          destruct s; cbn; inv_eqitree EQ.
-          destruct s; cbn; inv_eqitree EQ.
-          destruct a; cbn in EQ; try contradiction.
-          constructor.
-          rewrite bind_trigger; apply eqit_Vis; intros [].
           symmetry; auto.
-          destruct a; cbn in EQ; contradiction.
-      + (* [get_hd] starts with a [Tau] *)
-        intros; subst.
-        pose proof (itree_eta P) as EQ.
-        rewrite EQ.
-        apply get_hd_eq_itree in EQ.
-        rewrite H in EQ; clear H.
-        destruct (observe P);
-          rewrite get_hd_unfold in EQ;
-          cbn in EQ;
-          inv_eqitree EQ.
-        * admit.
-        * destruct e; cbn in *; inv_eqitree EQ.
-          destruct s; cbn in *; inv_eqitree EQ.
-          destruct a0; cbn in *; inv_eqitree EQ.
-          destruct s; cbn in *; inv_eqitree EQ.
-          destruct s; cbn in *; inv_eqitree EQ.
-      (*
-        eapply S_Tau; [apply IHReturns_legacy |].
-        admit.
-        admit. *)
-      + intros; subst.
-        pose proof (itree_eta P) as EQ; rewrite EQ; apply get_hd_eq_itree in EQ.
-        rewrite H in EQ; clear H.
-        destruct (observe P); rewrite get_hd_unfold in EQ; cbn in EQ; inv_eqitree EQ.
-        destruct e0; cbn in *; inv_eqitree EQ.
-        * admit.
-        * destruct s; cbn in *; inv_eqitree EQ.
-          destruct a0; cbn in *; inv_eqitree EQ.
-          destruct s; cbn in *; inv_eqitree EQ.
-          destruct s; cbn in *; inv_eqitree EQ.
-   - (* Step -> Returns *)
-      induction H.
-      + admit.
-      + admit. *)
+  (*
+    destruct s; cbn; inv_eqitree EQ.
+    destruct s; cbn; inv_eqitree EQ.
+    destruct a; cbn in EQ; try contradiction.
+    constructor.
+    rewrite bind_trigger; apply eqit_Vis; intros [].
+    symmetry; auto.
+    destruct a; cbn in EQ; contradiction.
+    + (* [get_hd] starts with a [Tau] *)
+    intros; subst.
+    pose proof (itree_eta P) as EQ.
+    rewrite EQ.
+    apply get_hd_eq_itree in EQ.
+    rewrite H in EQ; clear H.
+    destruct (observe P);
+    rewrite get_hd_unfold in EQ;
+    cbn in EQ;
+    inv_eqitree EQ.
+    * admit.
+    * destruct e; cbn in *; inv_eqitree EQ.
+    destruct s; cbn in *; inv_eqitree EQ.
+    destruct a0; cbn in *; inv_eqitree EQ.
+    destruct s; cbn in *; inv_eqitree EQ.
+    destruct s; cbn in *; inv_eqitree EQ.
+    (*
+    eapply S_Tau; [apply IHReturns_legacy |].
+    admit.
+    admit. *)
+    + intros; subst.
+    pose proof (itree_eta P) as EQ; rewrite EQ; apply get_hd_eq_itree in EQ.
+    rewrite H in EQ; clear H.
+    destruct (observe P); rewrite get_hd_unfold in EQ; cbn in EQ; inv_eqitree EQ.
+    destruct e0; cbn in *; inv_eqitree EQ.
+    * admit.
+    * destruct s; cbn in *; inv_eqitree EQ.
+    destruct a0; cbn in *; inv_eqitree EQ.
+    destruct s; cbn in *; inv_eqitree EQ.
+    destruct s; cbn in *; inv_eqitree EQ.
+    - (* Step -> Returns *)
+    induction H.
+    + admit.
+    + admit. *)
   Admitted.
 
   Theorem get_hd_always_returns : forall P, exists a k, Returns (head_of_action a k) (get_hd (model P)).

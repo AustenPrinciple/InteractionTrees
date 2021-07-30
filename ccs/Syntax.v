@@ -35,12 +35,12 @@ Definition op (a : action) : action :=
 
 Definition eqb_action : action -> action -> bool :=
   fun a b => match a,b with
-      | Send c, Send c' 
+      | Send c, Send c'
       | Rcv c, Rcv c' => String.eqb c c'
       | _, _ => false
   end .
 
-Lemma eqb_action_refl : forall a, 
+Lemma eqb_action_refl : forall a,
    eqb_action a a = true.
 Proof.
   intros []; cbn; auto using eqb_refl.
@@ -53,7 +53,7 @@ Module CCSNotations.
 
   Declare Scope ccs_scope.
 
-  Infix "=?" := eqb_action : ccs_scope. 
+  Infix "=?" := eqb_action : ccs_scope.
   Notation "0" := DoneT : ccs_scope.
   Notation "a ⋅ P" := (ActionT a P) (at level 10) : ccs_scope.
   Notation "P ∥ Q" := (ParaT P Q) (at level 29, left associativity) : ccs_scope.

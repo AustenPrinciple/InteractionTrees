@@ -1,7 +1,7 @@
 (coq.extraction
  (prelude ExtractCCS)
  (extracted_modules model)
- (theories ITree CCS)
+ (theories CCS)
 )
 
 (executable

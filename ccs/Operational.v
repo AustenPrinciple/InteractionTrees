@@ -51,7 +51,7 @@ Section Example.
   Qed.
 
   Fact ex2: forall P Q,
-    step (ex P Q) (Some (↑b)) ((0 ∥ ↓a ⋅ Q) ∖ a).
+      step (ex P Q) (Some (↑b)) ((0 ∥ ↓a ⋅ Q) ∖ a).
     intros.
     apply SRes; auto.
     eapply SParL.
@@ -67,8 +67,8 @@ Section Example.
 
   Fact ex3 : forall P Q R α,
       step (ex P Q) α R ->
-    (α = None /\ R = ((P ∥ Q) ∖ a)) \/ 
-    (α = Some (↑b) /\ R = ((0 ∥ ↓a ⋅ Q) ∖ a)). 
+    (α = None /\ R = ((P ∥ Q) ∖ a)) \/
+    (α = Some (↑b) /\ R = ((0 ∥ ↓a ⋅ Q) ∖ a)).
     intros.
     repeat inv_step; cbn in *; try (easy || eauto).
   Qed.

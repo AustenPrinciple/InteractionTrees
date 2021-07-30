@@ -8,7 +8,6 @@
    Denotational
    EquivalenceDO
  )
- (theories ITree)
 )
 
 ; Extraction is in a separate directory (extraction/) because dune's
