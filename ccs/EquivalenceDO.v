@@ -239,7 +239,8 @@ Section EquivSem.
   Inductive Returns_legacy {E} {A: Type} (a: A) : itree E A -> Prop :=
   | Returns_legacyRet: forall t, t ≅ Ret a -> Returns_legacy a t
   | Returns_legacyTau: forall t u, t ≅ Tau u -> Returns_legacy a u -> Returns_legacy a t
-  | Returns_legacyVis: forall {X} (e: E X) (x: X) t k, t ≅ Vis e k -> Returns_legacy a (k x) -> Returns_legacy a t.
+  | Returns_legacyVis: forall {X} (e: E X) (x: X) t k,
+      t ≅ Vis e k -> Returns_legacy a (k x) -> Returns_legacy a t.
 
   Inductive Returns {A: Type} (a: A) : ccsT A -> Prop :=
   | ReturnsRet: forall t, t ≅ Ret a -> Returns a t
@@ -278,90 +279,81 @@ Section EquivSem.
                                    end) ->
       Returns a R -> Returns a t.
 
-  Inductive Finite {E X} : itree E X -> Prop :=
-  | FRet : forall R t (x: X), eq_itree R t (Ret x) -> Finite t
-  | FTau : forall R t P, eq_itree R t (Tau P) -> Finite P -> Finite t
-  | FVis {A} : forall R t (e: E A) k,
-      eq_itree R t (Vis e k) -> (forall x, Finite (k x)) -> Finite t.
+  Inductive Finite {E X} R : itree E X -> Prop :=
+  | FRet : forall t (x: X), eq_itree R t (Ret x) -> Finite R t
+  | FTau : forall t P, eq_itree R t (Tau P) -> Finite R P -> Finite R t
+  | FVis {A} : forall t (e: E A) k,
+      eq_itree R t (Vis e k) -> (forall x, Finite R (k x)) -> Finite R t.
 
-  Inductive FiniteSchedTree {X} : itree ccsE X -> Prop :=
-  | FSTRet : forall R t (x: X), eq_itree R t (Ret x) -> FiniteSchedTree t
-  | FSTTau : forall R t P, eq_itree R t (Tau P) -> FiniteSchedTree P -> FiniteSchedTree t
-  | FSTPlus : forall R t k,
+  Inductive FiniteSchedTree {X} R : itree ccsE X -> Prop :=
+  | FSTRet : forall t (x: X), eq_itree R t (Ret x) -> FiniteSchedTree R t
+  | FSTTau : forall t P, eq_itree R t (Tau P) -> FiniteSchedTree R P -> FiniteSchedTree R t
+  | FSTPlus : forall t k,
       eq_itree R t (b <- trigger Plus;; k b) ->
-      (forall b, FiniteSchedTree (k b)) ->
-      FiniteSchedTree t
-  | FSTSched2 : forall R t k,
+      (forall b, FiniteSchedTree R (k b)) ->
+      FiniteSchedTree R t
+  | FSTSched2 : forall t k,
       eq_itree R t (b <- trigger Sched2;; k b) ->
-      (forall b, FiniteSchedTree (k b)) ->
-      FiniteSchedTree t
-  | FSTSched3 : forall R t k,
+      (forall b, FiniteSchedTree R (k b)) ->
+      FiniteSchedTree R t
+  | FSTSched3 : forall t k,
       eq_itree R t (c <- trigger Sched3;; k c) ->
-      (forall c, FiniteSchedTree (k c)) ->
-      FiniteSchedTree t.
+      (forall c, FiniteSchedTree R (k c)) ->
+      FiniteSchedTree R t.
 
   Global Instance Finite_eq_itree {E X} R :
-    Proper (eq_itree R ==> flip impl) (@Finite E X).
+    Transitive R -> Proper (eq_itree R ==> flip impl) (@Finite E X R).
   Proof.
     do 4 red.
-    intros x y Cong Fin.
+    intros TR x y Cong Fin.
     revert x Cong.
     induction Fin;
       intros.
-    - apply FRet with (rcompose R R0) x.
-      eapply eqit_trans;
-        eauto.
+    - apply FRet with x.
+      now rewrite Cong.
     - apply eqitree_inv_Tau_r in H.
       destruct H as [t' [Obs Cong']].
-      apply FTau with (rcompose R R0) P.
-      + eapply eqit_trans.
-        * apply Cong.
-        * rewrite itree_eta, Obs.
-          apply eqit_Tau.
-          apply Cong'.
+      apply FTau with P.
+      + rewrite Cong.
+        rewrite itree_eta, Obs.
+        now apply eqit_Tau.
       + assumption.
     - apply eqitree_inv_Vis_r in H.
       destruct H as [t' [Obs Cong']].
       eapply FVis.
-      + eapply eqit_trans.
-        * eauto.
-        * rewrite itree_eta, Obs.
-          apply eqit_Vis.
-          apply Cong'.
+      + rewrite Cong.
+        rewrite itree_eta, Obs.
+        apply eqit_Vis.
+        apply Cong'.
       + assumption.
   Qed.
 
   Global Instance FST_eq_itree {X} R :
-    Proper (eq_itree R ==> flip impl) (@FiniteSchedTree X).
+    Transitive R -> Proper (eq_itree R ==> flip impl) (@FiniteSchedTree X R).
   Proof.
     do 4 red.
-    intros x y Cong Fin.
+    intros TR x y Cong Fin.
     revert x Cong.
     induction Fin;
       intros.
-    - apply FSTRet with (rcompose R R0) x.
-      eapply eqit_trans;
-        eauto.
+    - apply FSTRet with x.
+      now rewrite Cong.
     - apply eqitree_inv_Tau_r in H.
       destruct H as [t' [Obs Cong']].
-      apply FSTTau with (rcompose R R0) P.
-      + eapply eqit_trans.
-        * eauto.
-        * rewrite itree_eta, Obs.
-          apply eqit_Tau.
-          apply Cong'.
+      apply FSTTau with P.
+      + rewrite Cong.
+        rewrite itree_eta, Obs.
+        apply eqit_Tau.
+        apply Cong'.
       + assumption.
-    - apply FSTPlus with (rcompose R R0) k.
-      + eapply eqit_trans;
-          eauto.
+    - apply FSTPlus with k.
+      + now rewrite Cong.
       + assumption.
-    - apply FSTSched2 with (rcompose R R0) k.
-      + eapply eqit_trans;
-          eauto.
+    - apply FSTSched2 with k.
+      + now rewrite Cong.
       + assumption.
-    - apply FSTSched3 with (rcompose R R0) k.
-      + eapply eqit_trans;
-          eauto.
+    - apply FSTSched3 with k.
+      + now rewrite Cong.
       + assumption.
   Qed.
 
