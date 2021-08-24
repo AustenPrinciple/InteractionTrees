@@ -387,9 +387,68 @@ Section EquivSem.
       + constructor; auto.
   Qed.
 
+  Lemma eq_head_trans {R} :
+    Transitive R -> Transitive (eq_head R).
+  Proof.
+    unfold Transitive.
+    intros.
+    induction x, y, z;
+      cbn;
+      try (reflexivity || contradiction).
+    - unfold eq_head in *.
+      eapply Transitive_eqit;
+        eauto.
+    - unfold eq_head in *.
+      destruct H0, H1.
+      split.
+      + now rewrite H0.
+      + eapply Transitive_eqit;
+          eauto.
+  Qed.
+
+  Lemma eq_head_refl {R} :
+    Reflexive R -> Reflexive (eq_head R).
+  Proof.
+    unfold Reflexive.
+    induction x;
+      cbn.
+    - reflexivity.
+    - now apply Reflexive_eqit.
+    - split.
+      + reflexivity.
+      + now apply Reflexive_eqit.
+  Qed.
+
+  Global Instance FST_eq_head :
+    Proper (eq_itree eq ==> flip impl) (FiniteSchedTree (eq_head eq)).
+  Proof.
+    do 4 red.
+    intros * Cong FST.
+    revert Cong.
+    induction FST;
+      intros.
+    - apply FSTRet with x0.
+      now rewrite Cong.
+    - apply FSTTau with P.
+      + now rewrite Cong.
+      + assumption.
+    - eapply FSTPlus.
+      + rewrite Cong.
+        apply H.
+      + assumption.
+    - eapply FSTSched2.
+      + rewrite Cong.
+        apply H.
+      + assumption.
+    - eapply FSTSched3.
+      + rewrite Cong.
+        apply H.
+      + assumption.
+  Qed.
+
   Lemma step_ccs_through_FST :
     forall (t : ccsT head) (k : head -> ccs) (q : ccs) a hd,
-      FiniteSchedTree t ->
+      FiniteSchedTree (eq_head eq) t ->
       Returns_legacy hd t ->
       k hd ⊢ a →ccs q ->
       (hd <- t;; k hd) ⊢ a →ccs q.
@@ -442,7 +501,7 @@ Section EquivSem.
 
   Lemma step_ccs_through_FST_weak :
     forall (t : ccsT head) (k : head -> ccs) (q : ccs) a,
-      FiniteSchedTree t ->
+      FiniteSchedTree (eq_head eq) t ->
       (forall hd, k hd ⊢ a →ccs q) ->
       (hd <- t;; k hd) ⊢ a →ccs q.
   Proof.
@@ -469,46 +528,62 @@ Section EquivSem.
     intros.
     induction H.
     - pose proof (get_hd_unfold (act a;; P)) as Eq;
-        cbn in Eq.
+        cbn in Eq;
+        revert Eq;
+        ITree.fold_subst;
+        intro.
       apply Returns_legacyRet.
       unfold head_of_action.
-      
+      (* since the right part of Eq is (Ret tt;; P) maybe it's not
+         a ≅ we want but a ≈ ? *)
   Admitted.
 
-  Lemma finite_head : forall (P : ccs),
-    Finite P ->
-    FiniteSchedTree (get_hd P).
+  Lemma finite_head_eq : forall (P : ccs),
+    Finite eq P ->
+    FiniteSchedTree (eq_head eq) (get_hd P).
   Proof.
     intros.
     induction H.
     - (* Ret *)
       pose proof (get_hd_unfold (Ret x)) as Eq;
         cbn in Eq.
-      apply FSTRet with (eq_head R) HDone.
+      apply FSTRet with HDone.
       apply get_hd_eq_itree in H.
       now rewrite Eq in H.
     - (* Tau *)
       pose proof (get_hd_unfold (Tau P)) as Eq;
         cbn in Eq.
-      rewrite H, Eq.
-      now apply FSTTau with eq (get_hd P).
+      eapply FST_eq_itree.
+      + apply eq_head_trans.
+        apply eq_Transitive.
+      + apply get_hd_eq_itree.
+        apply H.
+      + rewrite Eq.
+        apply FSTTau with (get_hd P).
+        * apply Reflexive_eqit, eq_head_refl, eq_Reflexive.
+        * assumption.
     - (* Vis *)
-      rewrite H.
-      rewrite get_hd_unfold; cbn.
-      break_match_goal.
-      + (* Vis NonDetE, special case *)
-        induction n;
-          [ apply FSTPlus with eq (fun x => get_hd (k x))
-          | apply FSTSched2 with eq (fun x => get_hd (k x))
-          | apply FSTSched3 with eq (fun x => get_hd (k x))];
-          (now rewrite bind_trigger || assumption).
-      + (* Vis anything else *)
-        repeat break_match_goal;
-          now eapply FSTRet.
+      eapply FST_eq_itree.
+      + apply eq_head_trans, eq_Transitive.
+      + apply get_hd_eq_itree.
+        apply H.
+      + rewrite get_hd_unfold; cbn.
+        break_match_goal.
+        * (* Vis NonDetE, special case *)
+          induction n;
+            [ apply FSTPlus with (fun x => get_hd (k x))
+            | apply FSTSched2 with (fun x => get_hd (k x))
+            | apply FSTSched3 with (fun x => get_hd (k x))];
+            (rewrite bind_trigger || assumption);
+            apply Reflexive_eqit, eq_head_refl, eq_Reflexive.
+        * (* Vis anything else *)
+          repeat break_match_goal;
+            eapply FSTRet;
+            apply Reflexive_eqit, eq_head_refl, eq_Reflexive.
   Qed.
 
   Lemma finite_bind {E X Y} : forall (t: itree E Y) (k: Y -> itree E X),
-      Finite t -> (forall y, Finite (k y)) -> Finite (y <- t;; k y).
+      Finite eq t -> (forall y, Finite eq (k y)) -> Finite eq (y <- t;; k y).
   Proof.
     intros * Fin.
     induction Fin;
@@ -520,10 +595,7 @@ Section EquivSem.
       eapply FTau.
       + reflexivity.
       + apply IHFin in FinK.
-        (* now rewrite Rel.
-           missing Proper eq_itree R | Finite or bind?
-         *)
-        admit.
+        now rewrite Rel.
     - apply eqitree_inv_Vis_r in H as [k' [Eq Rel]].
       rewrite unfold_bind, Eq.
       eapply FVis.
@@ -531,18 +603,16 @@ Section EquivSem.
       + cbn.
         intros.
         apply H1 with x in FinK.
-        (* now rewrite Rel.
-           missing Proper eq_itree R | Finite or bind?
-         *)
-        admit.
-  Admitted.
+        now rewrite Rel.
+  Qed.
 
-  Lemma FST_means_Finite {X}: forall (P: itree ccsE X), FiniteSchedTree P -> Finite P.
+  Lemma FST_means_Finite {X}: forall (P: itree ccsE X),
+      FiniteSchedTree eq P -> Finite eq P.
   Proof.
     intros.
     induction H.
-    - now apply FRet with R x.
-    - now apply FTau with R P.
+    - now apply FRet with x.
+    - now apply FTau with P.
     - rewrite bind_trigger in H.
       eapply FVis;
         eauto.
@@ -555,9 +625,9 @@ Section EquivSem.
   Qed.
 
   Lemma finite_interp {E F X} : forall (h : Handler E F) (t : itree E X),
-      Finite t ->
-      (forall Y (e : E Y), Finite (h _ e)) ->
-      Finite (interp h t).
+      Finite eq t ->
+      (forall Y (e : E Y), Finite eq (h _ e)) ->
+      Finite eq (interp h t).
   Proof.
     intros h t FinT.
     revert h.
@@ -567,18 +637,15 @@ Section EquivSem.
       rewrite unfold_interp;
         unfold _interp;
         rewrite Eq.
-      now apply FRet with eq r'.
+      now apply FRet with r'.
     - apply eqitree_inv_Tau_r in H as [t' [Eq Rel]].
       rewrite unfold_interp;
         unfold _interp;
         rewrite Eq.
-      apply FTau with eq (interp h t').
+      apply FTau with (interp h t').
       + reflexivity.
       + apply IHFinT in H0.
-        (* now rewrite Rel.
-           missing Proper eq_itree R | Finite or interp?
-         *)
-        admit.
+        now rewrite Rel.
     - apply eqitree_inv_Vis_r in H as [k' [Eq Rel]].
       rewrite unfold_interp;
         unfold _interp;
@@ -586,14 +653,11 @@ Section EquivSem.
       apply finite_bind.
       + apply H2.
       + intro.
-        apply FTau with eq (interp h (k' y)).
+        apply FTau with (interp h (k' y)).
         * reflexivity.
         * apply H1 with (x := y) in H2.
-          (* rewrite Rel.
-             missing Proper eq_itree R | Finite or interp?
-           *)
-          admit.
-  Admitted.
+          now rewrite Rel.
+  Qed.
 
   (* In order to prove that : [forall P, finite (model P)],
      we need to reason about the co-recursive call performed by para.
