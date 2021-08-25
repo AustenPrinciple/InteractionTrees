@@ -242,6 +242,41 @@ Section EquivSem.
   | Returns_legacyVis: forall {X} (e: E X) (x: X) t k,
       t ≅ Vis e k -> Returns_legacy a (k x) -> Returns_legacy a t.
 
+  Global Instance eq_itree_returns_leg {E A } (hd: A) :
+    Proper (@eq_itree E A A eq ==> flip impl) (Returns_legacy hd).
+  Proof.
+    do 4 red.
+    intros * Eq Ret.
+    revert Eq.
+    induction Ret;
+      intros.
+    - constructor.
+      now rewrite Eq.
+    - apply Returns_legacyTau with u.
+      + now rewrite Eq.
+      + assumption.
+    - eapply Returns_legacyVis.
+      + rewrite Eq.
+        apply H.
+      + apply Ret.
+  Qed.
+
+  Lemma Returns_legacyRet_in {E A} : forall a (t: itree E A) u,
+      t ≅ Tau u -> Returns_legacy a t -> Returns_legacy a u.
+  Proof.
+    intros * Cong Ret.
+    revert u Cong.
+    induction Ret;
+      intros.
+    - rewrite H in Cong.
+      inv_eqitree Cong.
+    - rewrite H in Cong.
+      rewrite eqitree_Tau in Cong.
+      now rewrite <- Cong.
+    - rewrite H in Cong.
+      inv_eqitree Cong.
+  Qed.
+
   Inductive Returns {A: Type} (a: A) : ccsT A -> Prop :=
   | ReturnsRet: forall t, t ≅ Ret a -> Returns a t
   | ReturnsTau: forall t u, t ≅ Tau u -> Returns a u -> Returns a t
