@@ -477,7 +477,7 @@ Section EquivSem.
         rewrite Eq1 in Eq2.
         rewrite unfold_bind, Eq1, tau_eutt.
         (* rewrite Cong.
-           missing Proper eq_itree R | bind or step?
+           missing Proper eq_itree (eq_head eq) | bind
          *)
         admit.
       + apply eqitree_inv_Tau_r in H as [r [Eq1 _]].
@@ -516,7 +516,7 @@ Section EquivSem.
       rewrite tau_eutt.
       apply IHFiniteSchedTree in H1.
       (* now rewrite Rel.
-       * missing Proper eq_itree R | bind or step_ccs?
+       * missing Proper eq_itree (eq_head eq) | bind
        *)
   Admitted.
 
@@ -528,22 +528,21 @@ Section EquivSem.
     intros.
     induction H.
     - pose proof (get_hd_unfold (act a;; P)) as Eq;
-        cbn in Eq;
         revert Eq;
+        cbn;
         ITree.fold_subst;
         intro.
       apply Returns_legacyRet.
-      unfold head_of_action.
       (* since the right part of Eq is (Ret tt;; P) maybe it's not
          a ≅ we want but a ≈ ? *)
   Admitted.
 
-  Lemma finite_head_eq : forall (P : ccs),
-    Finite eq P ->
-    FiniteSchedTree (eq_head eq) (get_hd P).
+  Lemma finite_head : forall P,
+      Finite eq P ->
+      FiniteSchedTree (eq_head eq) (get_hd P).
   Proof.
-    intros.
-    induction H.
+    intros * Fin.
+    induction Fin.
     - (* Ret *)
       pose proof (get_hd_unfold (Ret x)) as Eq;
         cbn in Eq.
@@ -554,8 +553,7 @@ Section EquivSem.
       pose proof (get_hd_unfold (Tau P)) as Eq;
         cbn in Eq.
       eapply FST_eq_itree.
-      + apply eq_head_trans.
-        apply eq_Transitive.
+      + apply eq_head_trans, eq_Transitive.
       + apply get_hd_eq_itree.
         apply H.
       + rewrite Eq.
@@ -606,8 +604,8 @@ Section EquivSem.
         now rewrite Rel.
   Qed.
 
-  Lemma FST_means_Finite {X}: forall (P: itree ccsE X),
-      FiniteSchedTree eq P -> Finite eq P.
+  Lemma FST_means_Finite {X} : forall (P: ccsT X) R,
+      FiniteSchedTree R P -> Finite R P.
   Proof.
     intros.
     induction H.
