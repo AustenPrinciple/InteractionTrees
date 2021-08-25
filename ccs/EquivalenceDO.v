@@ -763,6 +763,12 @@ Section EquivSem.
         eauto.
   Qed.
 
+  (* proving this might be easier than finite_head', and we need one or the other *)
+  Lemma FST_means_Finite' : forall P,
+      FiniteSchedTree (eq_head eq) P -> Finite eq P.
+  Proof.
+  Admitted.
+
   Lemma finite_interp {E F X} : forall (h : Handler E F) (t : itree E X),
       Finite eq t ->
       (forall Y (e : E Y), Finite eq (h _ e)) ->
