@@ -1,5 +1,7 @@
 (* begin hide *)
-From Coq Require Import Morphisms.
+From Coq Require Import
+     Morphisms
+     Program.Equality.
 
 From ITree Require Import
      ITree
@@ -236,6 +238,20 @@ Section EquivSem.
     | None => HSynch
     end.
 
+  Lemma eqitree_inv_Vis_Type {E X1 X2 R1 R2} (RR : R1 -> R2 -> Prop) (e1 : E X1) (e2: E X2) (k1 : X1 -> itree E R1) (k2 : X2 -> itree E R2)
+        (EQ : eq_itree RR (Vis e1 k1) (Vis e2 k2)) : X1 = X2.
+  Proof.
+    punfold EQ; inv EQ.
+    dependent destruction H2; reflexivity.
+  Qed.
+
+  Lemma eqitree_inv_event {E X R} (RR : R -> R -> Prop) (e1 e2 : E X) (k1 k2 : X -> itree E R)
+        (EQ : eq_itree RR (Vis e1 k1) (Vis e2 k2)) : e1 = e2.
+  Proof.
+    punfold EQ; inv EQ.
+    dependent destruction H4; reflexivity.
+  Qed.
+
   Inductive Returns_legacy {E} {A: Type} (a: A) : itree E A -> Prop :=
   | Returns_legacyRet: forall t, t ≅ Ret a -> Returns_legacy a t
   | Returns_legacyTau: forall t u, t ≅ Tau u -> Returns_legacy a u -> Returns_legacy a t
@@ -261,7 +277,7 @@ Section EquivSem.
       + apply Ret.
   Qed.
 
-  Lemma Returns_legacyRet_in {E A} : forall a (t: itree E A) u,
+  Lemma Returns_legacyRet_inv {E A} : forall a (t: itree E A) u,
       t ≅ Tau u -> Returns_legacy a t -> Returns_legacy a u.
   Proof.
     intros * Cong Ret.
@@ -275,6 +291,25 @@ Section EquivSem.
       now rewrite <- Cong.
     - rewrite H in Cong.
       inv_eqitree Cong.
+  Qed.
+
+  Lemma Returns_legacyVis_inv {E X A} : forall (a: A) (e: E X) k t,
+      t ≅ Vis e k -> Returns_legacy a t -> (exists x, Returns_legacy a (k x)).
+  Proof.
+    intros * Cong Ret.
+    revert X e k Cong.
+    induction Ret;
+      intros.
+    - rewrite H in Cong.
+      inv_eqitree Cong.
+    - rewrite H in Cong.
+      inv_eqitree Cong.
+    - rewrite H in Cong.
+      apply eqitree_inv_Vis_Type in Cong as EE; subst.
+      apply eqitree_inv_event in Cong as Eqee; subst.
+      exists x.
+      eapply eqit_inv_Vis in Cong.
+      now rewrite Cong in Ret.
   Qed.
 
   Inductive Returns {A: Type} (a: A) : ccsT A -> Prop :=
@@ -483,7 +518,7 @@ Section EquivSem.
 
   (* TODO: is this lemma really useful? *)
   Lemma step_eq_itree : forall t u v a,
-      eq_itree eq t u ->
+      t ≅ u ->
       t ⊢ a →ccs v ->
       u ⊢ a →ccs v.
   Proof.
@@ -502,6 +537,24 @@ Section EquivSem.
     - now apply S_Sched3_R with L R R' S.
     - now apply S_Sched3_S with L R S S'.
   Qed.
+
+  Lemma plus_can_step {X} : forall k (k': X -> ccs) a b q,
+      (hd <- k b;; k' hd) ⊢ a →ccs q ->
+      vis Plus (fun x => (hd <- k x;; k' hd)) ⊢ a →ccs q.
+  Proof.
+  Admitted.
+
+  Lemma sched2_can_step {X} : forall k (k': X -> ccs) a b q,
+      (hd <- k b;; k' hd) ⊢ a →ccs q ->
+      vis Sched2 (fun x => (hd <- k x;; k' hd)) ⊢ a →ccs q.
+  Proof.
+  Admitted.
+
+  Lemma sched3_can_step {X} : forall k (k': X -> ccs) a b q,
+      (hd <- k b;; k' hd) ⊢ a →ccs q ->
+      vis Sched3 (fun x => (hd <- k x;; k' hd)) ⊢ a →ccs q.
+  Proof.
+  Admitted.
 
   Lemma step_ccs_through_FST :
     forall (t : ccsT head) (k : head -> ccs) (q : ccs) a hd,
@@ -527,22 +580,47 @@ Section EquivSem.
         inv_eqitree H2.
       + rewrite H, tau_eutt.
         apply IHFin.
-        * now apply Returns_legacyRet_in with t.
+        * now apply Returns_legacyRet_inv with t.
         * assumption.
       + rewrite H in H2.
         inv_eqitree H2.
-    - inversion H2; subst.
-      + rewrite H, bind_trigger in H4.
-        inv_eqitree H4.
-      + rewrite H, bind_trigger in H4.
-        inv_eqitree H4.
-      + (* need to show that
-         * Vis e k ≅ Vis f l -> e = f /\ k = l
-         *)
-        admit.
-    - admit.
-    - admit.
-  Admitted.
+    - inversion H2;
+        subst;
+        rewrite bind_trigger in H;
+        rewrite H in H4;
+        try inv_eqitree H4.
+      apply eqitree_inv_Vis_Type in H4 as H6; subst.
+      apply eqitree_inv_event in H4 as H6; subst.
+      eapply eqit_inv_Vis in H4.
+      rewrite <- H4 in H5.
+      rewrite H, bind_vis.
+      apply plus_can_step with x.
+      now apply H1.
+    - inversion H2;
+        subst;
+        rewrite bind_trigger in H;
+        rewrite H in H4;
+        try inv_eqitree H4.
+      apply eqitree_inv_Vis_Type in H4 as H6; subst.
+      apply eqitree_inv_event in H4 as H6; subst.
+      eapply eqit_inv_Vis in H4.
+      rewrite <- H4 in H5.
+      rewrite H, bind_vis.
+      apply sched2_can_step with x.
+      now apply H1.
+    - inversion H2;
+        subst;
+        rewrite bind_trigger in H;
+        rewrite H in H4;
+        try inv_eqitree H4.
+      apply eqitree_inv_Vis_Type in H4 as H6; subst.
+      apply eqitree_inv_event in H4 as H6; subst.
+      eapply eqit_inv_Vis in H4.
+      rewrite <- H4 in H5.
+      rewrite H, bind_vis.
+      apply sched3_can_step with x.
+      now apply H1.
+  Qed.
 
   Lemma step_ccs_through_FST_weak :
     forall (t : ccsT head) (k : head -> ccs) (q : ccs) a,
