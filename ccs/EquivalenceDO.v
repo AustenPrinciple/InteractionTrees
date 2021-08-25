@@ -481,9 +481,31 @@ Section EquivSem.
       + assumption.
   Qed.
 
+  (* TODO: is this lemma really useful? *)
+  Lemma step_eq_itree : forall t u v a,
+      eq_itree eq t u ->
+      t ⊢ a →ccs v ->
+      u ⊢ a →ccs v.
+  Proof.
+    intros * Cong Step.
+    revert Cong.
+    induction Step;
+      intros;
+      try rewrite <- Cong.
+    - now constructor.
+    - now constructor.
+    - now apply S_Plus_L with L R.
+    - now apply S_Plus_R with L R.
+    - now apply S_Sched2_L with L L' R.
+    - now apply S_Sched2_R with L R R'.
+    - now apply S_Sched3_L with L L' R S.
+    - now apply S_Sched3_R with L R R' S.
+    - now apply S_Sched3_S with L R S S'.
+  Qed.
+
   Lemma step_ccs_through_FST :
     forall (t : ccsT head) (k : head -> ccs) (q : ccs) a hd,
-      FiniteSchedTree (eq_head eq) t ->
+      FiniteSchedTree eq t ->
       Returns_legacy hd t ->
       k hd ⊢ a →ccs q ->
       (hd <- t;; k hd) ⊢ a →ccs q.
@@ -492,67 +514,52 @@ Section EquivSem.
     induction Fin;
       intros.
     - inversion H0; subst.
-      + apply eqitree_inv_Ret_r in H2 as [r [EqR Eq]].
-        rewrite unfold_bind, Eq, EqR.
-        assumption.
-      + apply eqitree_inv_Tau_r in H2 as [t' [Eq1 _]].
-        apply eqitree_inv_Ret_r in H as [r [_ Eq2]].
-        rewrite Eq1 in Eq2.
-        discriminate.
-      + apply eqitree_inv_Ret_r in H as [r [_ Eq1]].
-        apply eqitree_inv_Vis_r in H2 as [k' [Eq2 _]].
-        rewrite Eq1 in Eq2.
-        discriminate.
+      + rewrite H, bind_ret_l.
+        rewrite H in H2.
+        apply eqit_Ret in H2.
+        now rewrite H2.
+      + rewrite H in H2.
+        inv_eqitree H2.
+      + rewrite H in H2.
+        inv_eqitree H2.
     - inversion H0; subst.
-      + apply eqitree_inv_Ret_r in H2 as [r [EqR Eq]].
-        rewrite unfold_bind, Eq, EqR.
-        assumption.
-      + apply eqitree_inv_Tau_r in H as [t' [Eq1 Cong]].
-        apply eqitree_inv_Tau_r in H2 as [t'' [Eq2 Cong']].
-        rewrite Eq1 in Eq2.
-        rewrite unfold_bind, Eq1, tau_eutt.
-        (* rewrite Cong.
-           missing Proper eq_itree (eq_head eq) | bind
+      + rewrite H in H2.
+        inv_eqitree H2.
+      + rewrite H, tau_eutt.
+        apply IHFin.
+        * now apply Returns_legacyRet_in with t.
+        * assumption.
+      + rewrite H in H2.
+        inv_eqitree H2.
+    - inversion H2; subst.
+      + rewrite H, bind_trigger in H4.
+        inv_eqitree H4.
+      + rewrite H, bind_trigger in H4.
+        inv_eqitree H4.
+      + (* need to show that
+         * Vis e k ≅ Vis f l -> e = f /\ k = l
          *)
         admit.
-      + apply eqitree_inv_Tau_r in H as [r [Eq1 _]].
-        apply eqitree_inv_Vis_r in H2 as [k' [Eq2 ]].
-        rewrite Eq1 in Eq2.
-        discriminate.
-    - rewrite bind_trigger in H.
-      apply eqitree_inv_Vis_r in H as [k' [Eq1 RR]].
-      inversion H2; subst.
-      + apply eqitree_inv_Ret_r in H as [r [_ Eq2]].
-        rewrite Eq1 in Eq2.
-        discriminate.
-      + apply eqitree_inv_Tau_r in H as [r [Eq2 _]].
-        rewrite Eq1 in Eq2.
-        discriminate.
-      + apply eqitree_inv_Vis_r in H as [k'' [Eq2 RR']].
-        rewrite Eq1 in Eq2.
-        (* need to prove that k' = k'' = k0 = k1 *)
-        admit.
+    - admit.
+    - admit.
   Admitted.
 
   Lemma step_ccs_through_FST_weak :
     forall (t : ccsT head) (k : head -> ccs) (q : ccs) a,
-      FiniteSchedTree (eq_head eq) t ->
+      FiniteSchedTree eq t ->
       (forall hd, k hd ⊢ a →ccs q) ->
       (hd <- t;; k hd) ⊢ a →ccs q.
   Proof.
-    intros.
-    revert k q a H0.
-    induction H;
+    intros * FST Step.
+    revert k q a Step.
+    induction FST;
       intros.
-    - apply eqitree_inv_Ret_r in H as [r' [_ Eq]].
-      now rewrite unfold_bind, Eq.
-    - apply eqitree_inv_Tau_r in H as [t0 [Eq Rel]].
-      rewrite unfold_bind, Eq.
-      rewrite tau_eutt.
-      apply IHFiniteSchedTree in H1.
-      (* now rewrite Rel.
-       * missing Proper eq_itree (eq_head eq) | bind
-       *)
+    - now rewrite H, bind_ret_l.
+    - rewrite H, tau_eutt.
+      now apply IHFST.
+    - admit.
+    - admit.
+    - admit.
   Admitted.
 
   Lemma step_ccs_is_returned_by_get_hd :
@@ -614,6 +621,27 @@ Section EquivSem.
             eapply FSTRet;
             apply Reflexive_eqit, eq_head_refl, eq_Reflexive.
   Qed.
+
+  Lemma finite_head' : forall P,
+      Finite eq P ->
+      FiniteSchedTree eq (get_hd P).
+  Proof.
+    intros * Fin.
+    induction Fin.
+    - apply FSTRet with HDone.
+      pose proof (get_hd_unfold (Ret x)) as Eq;
+        cbn in Eq.
+      rewrite <- Eq.
+      (* this seems trivial but get_hd doesn't interact well with ≅ *)
+      admit.
+    - pose proof (get_hd_unfold (Tau P)) as Eq;
+        cbn in Eq.
+      apply FSTTau with (get_hd P).
+      + rewrite <- Eq.
+        admit.
+      + assumption.
+    - admit.
+  Admitted.
 
   Lemma finite_bind {E X Y} : forall (t: itree E Y) (k: Y -> itree E X),
       Finite eq t -> (forall y, Finite eq (k y)) -> Finite eq (y <- t;; k y).
@@ -705,13 +733,13 @@ Section EquivSem.
      a bit of boilerplate and work.
    *)
   Lemma finite_model : forall (P : term),
-      Finite ⟦P⟧.
+      Finite eq ⟦P⟧.
   Proof.
     induction P;
       cbn.
     - (* 0 *)
       unfold done.
-      now apply FRet with eq tt.
+      now apply FRet with tt.
     - (* a ⋅ P *)
       unfold act.
       rewrite bind_trigger.
@@ -720,15 +748,15 @@ Section EquivSem.
       rewrite para_unfold.
       apply finite_bind.
       + apply FST_means_Finite.
-        now apply finite_head.
+        now apply finite_head'.
       + intro rP.
         apply finite_bind.
         * apply FST_means_Finite.
-          now apply finite_head.
+          now apply finite_head'.
         * intro rQ.
           destruct rP, rQ;
             try assumption.
-          -- now apply FRet with eq tt.
+          -- now apply FRet with tt.
           -- admit.
           -- admit.
           -- admit.
@@ -800,9 +828,9 @@ Section EquivSem.
     rewrite para_unfold.
     apply step_ccs_through_FST with (head_of_action a ⟦P'⟧).
     3:apply step_ccs_through_FST_weak.
-    * apply finite_head, finite_model.
+    * apply finite_head', finite_model.
     * apply step_ccs_is_returned_by_get_hd; assumption.
-    * apply finite_head, finite_model.
+    * apply finite_head', finite_model.
     * intros hd.
       destruct hd eqn:EQHD, a eqn:EQa; cbn;
         try (constructor; unfold act,synch; rewrite bind_trigger; reflexivity);
@@ -823,8 +851,8 @@ Section EquivSem.
     rewrite para_unfold.
     apply step_ccs_through_FST_weak.
     2:intros; apply step_ccs_through_FST with (head_of_action a ⟦Q'⟧).
-    * apply finite_head, finite_model.
-    * apply finite_head, finite_model.
+    * apply finite_head', finite_model.
+    * apply finite_head', finite_model.
     * apply step_ccs_is_returned_by_get_hd; assumption.
     * destruct hd eqn:EQHD, a eqn:EQa; cbn;
         try (constructor; unfold act,synch; rewrite bind_trigger; reflexivity);
@@ -846,9 +874,9 @@ Section EquivSem.
     rewrite para_unfold.
     apply step_ccs_through_FST with (head_of_action (Some a) ⟦P'⟧).
     3:apply step_ccs_through_FST with (head_of_action (Some (op a)) ⟦Q'⟧).
-    * apply finite_head, finite_model.
+    * apply finite_head', finite_model.
     * apply step_ccs_is_returned_by_get_hd; assumption.
-    * apply finite_head, finite_model.
+    * apply finite_head', finite_model.
     * apply step_ccs_is_returned_by_get_hd; assumption.
     * cbn.
       unfold are_opposite.
