@@ -531,30 +531,110 @@ Section EquivSem.
     - now constructor.
     - now apply S_Plus_L with L R.
     - now apply S_Plus_R with L R.
-    - now apply S_Sched2_L with L L' R.
-    - now apply S_Sched2_R with L R R'.
-    - now apply S_Sched3_L with L L' R S.
-    - now apply S_Sched3_R with L R R' S.
-    - now apply S_Sched3_S with L R S S'.
+    - now apply S_Sched2_L with L R.
+    - now apply S_Sched2_R with L R.
+    - now apply S_Sched3_L with L R S.
+    - now apply S_Sched3_R with L R S.
+    - now apply S_Sched3_S with L R S.
   Qed.
 
+  (* the next three lemmas seem to be the useful versions of the one above *)
   Lemma plus_can_step {X} : forall k (k': X -> ccs) a b q,
       (hd <- k b;; k' hd) ⊢ a →ccs q ->
       vis Plus (fun x => (hd <- k x;; k' hd)) ⊢ a →ccs q.
   Proof.
-  Admitted.
+    intros.
+    case_eq b; intro.
+    - apply S_Plus_L with
+          (hd <- k true;; k' hd)
+          (hd <- k false;; k' hd).
+      + now rewrite H0 in H.
+      + unfold plus.
+        rewrite bind_trigger.
+        apply eqit_Vis.
+        intro.
+        case_eq u;
+          reflexivity.
+    - apply S_Plus_R with
+          (hd <- k true;; k' hd)
+          (hd <- k false;; k' hd).
+      + now rewrite H0 in H.
+      + unfold plus.
+        rewrite bind_trigger.
+        apply eqit_Vis.
+        intro.
+        case_eq u;
+          reflexivity.
+  Qed.
 
   Lemma sched2_can_step {X} : forall k (k': X -> ccs) a b q,
       (hd <- k b;; k' hd) ⊢ a →ccs q ->
       vis Sched2 (fun x => (hd <- k x;; k' hd)) ⊢ a →ccs q.
   Proof.
-  Admitted.
+    intros.
+    case_eq b; intro.
+    - apply S_Sched2_L with
+          (hd <- k true;; k' hd)
+          (hd <- k false;; k' hd).
+      + now rewrite H0 in H.
+      + unfold branch2.
+        rewrite bind_trigger.
+        apply eqit_Vis.
+        intro.
+        case_eq u;
+          reflexivity.
+    - apply S_Sched2_R with
+          (hd <- k true;; k' hd)
+          (hd <- k false;; k' hd).
+      + now rewrite H0 in H.
+      + unfold branch2.
+        rewrite bind_trigger.
+        apply eqit_Vis.
+        intro.
+        case_eq u;
+          reflexivity.
+  Qed.
 
   Lemma sched3_can_step {X} : forall k (k': X -> ccs) a b q,
       (hd <- k b;; k' hd) ⊢ a →ccs q ->
       vis Sched3 (fun x => (hd <- k x;; k' hd)) ⊢ a →ccs q.
   Proof.
-  Admitted.
+    intros.
+    case_eq b; intro.
+    - apply S_Sched3_L with
+          (hd <- k Left;; k' hd)
+          (hd <- k Right;; k' hd)
+          (hd <- k Synchronize;; k' hd).
+      + now rewrite H0 in H.
+      + unfold branch3.
+        rewrite bind_trigger.
+        apply eqit_Vis.
+        intro.
+        case_eq u;
+          reflexivity.
+    - apply S_Sched3_R with
+          (hd <- k Left;; k' hd)
+          (hd <- k Right;; k' hd)
+          (hd <- k Synchronize;; k' hd).
+      + now rewrite H0 in H.
+      + unfold branch3.
+        rewrite bind_trigger.
+        apply eqit_Vis.
+        intro.
+        case_eq u;
+          reflexivity.
+    - apply S_Sched3_S with
+          (hd <- k Left;; k' hd)
+          (hd <- k Right;; k' hd)
+          (hd <- k Synchronize;; k' hd).
+      + now rewrite H0 in H.
+      + unfold branch3.
+        rewrite bind_trigger.
+        apply eqit_Vis.
+        intro.
+        case_eq u;
+          reflexivity.
+  Qed.
 
   Lemma step_ccs_through_FST :
     forall (t : ccsT head) (k : head -> ccs) (q : ccs) a hd,
@@ -566,29 +646,26 @@ Section EquivSem.
     intros * Fin.
     induction Fin;
       intros.
-    - inversion H0; subst.
-      + rewrite H, bind_ret_l.
-        rewrite H in H2.
-        apply eqit_Ret in H2.
-        now rewrite H2.
-      + rewrite H in H2.
-        inv_eqitree H2.
-      + rewrite H in H2.
-        inv_eqitree H2.
-    - inversion H0; subst.
-      + rewrite H in H2.
-        inv_eqitree H2.
-      + rewrite H, tau_eutt.
-        apply IHFin.
-        * now apply Returns_legacyRet_inv with t.
-        * assumption.
-      + rewrite H in H2.
-        inv_eqitree H2.
+    - inversion H0;
+        subst;
+        rewrite H in H2;
+        [| inv_eqitree H2 | inv_eqitree H2].
+      rewrite H, bind_ret_l.
+      apply eqit_Ret in H2.
+      now rewrite H2.
+    - inversion H0;
+        subst;
+        rewrite H in H2;
+        [inv_eqitree H2 | | inv_eqitree H2].
+      rewrite H, tau_eutt.
+      apply IHFin.
+      + now apply Returns_legacyRet_inv with t.
+      + assumption.
     - inversion H2;
         subst;
         rewrite bind_trigger in H;
         rewrite H in H4;
-        try inv_eqitree H4.
+        [inv_eqitree H4 | inv_eqitree H4 |].
       apply eqitree_inv_Vis_Type in H4 as H6; subst.
       apply eqitree_inv_event in H4 as H6; subst.
       eapply eqit_inv_Vis in H4.
@@ -600,7 +677,7 @@ Section EquivSem.
         subst;
         rewrite bind_trigger in H;
         rewrite H in H4;
-        try inv_eqitree H4.
+        [inv_eqitree H4 | inv_eqitree H4 |].
       apply eqitree_inv_Vis_Type in H4 as H6; subst.
       apply eqitree_inv_event in H4 as H6; subst.
       eapply eqit_inv_Vis in H4.
@@ -612,7 +689,7 @@ Section EquivSem.
         subst;
         rewrite bind_trigger in H;
         rewrite H in H4;
-        try inv_eqitree H4.
+        [inv_eqitree H4 | inv_eqitree H4 |].
       apply eqitree_inv_Vis_Type in H4 as H6; subst.
       apply eqitree_inv_event in H4 as H6; subst.
       eapply eqit_inv_Vis in H4.
@@ -631,14 +708,22 @@ Section EquivSem.
     intros * FST Step.
     revert k q a Step.
     induction FST;
-      intros.
-    - now rewrite H, bind_ret_l.
-    - rewrite H, tau_eutt.
+      intros;
+      rewrite H.
+    - now rewrite bind_ret_l.
+    - rewrite tau_eutt.
       now apply IHFST.
-    - admit.
-    - admit.
-    - admit.
-  Admitted.
+    - rewrite bind_trigger, bind_vis.
+      (* For some reason we have to choose a boolean here...? *)
+      apply plus_can_step with true.
+      now apply H1.
+    - rewrite bind_trigger, bind_vis.
+      apply sched2_can_step with true.
+      now apply H1.
+    - rewrite bind_trigger, bind_vis.
+      apply sched3_can_step with Left.
+      now apply H1.
+  Qed.
 
   Lemma step_ccs_is_returned_by_get_hd :
     forall (p q : ccs) a,
