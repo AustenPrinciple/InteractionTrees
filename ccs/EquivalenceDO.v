@@ -331,50 +331,36 @@ Section EquivSem.
       (forall c, FiniteSchedTree R (k c)) ->
       FiniteSchedTree R t.
 
-  Global Instance Finite_eq_itree {E X} R :
-    Transitive R -> Proper (eq_itree R ==> flip impl) (@Finite E X R).
+  Global Instance Finite_cong {E X} :
+    Proper (eq_itree eq ==> flip impl) (@Finite E X eq).
   Proof.
     do 4 red.
-    intros TR x y Cong Fin.
+    intros x y Cong Fin.
     revert x Cong.
     induction Fin;
       intros.
     - apply FRet with x.
       now rewrite Cong.
-    - apply eqitree_inv_Tau_r in H.
-      destruct H as [t' [Obs Cong']].
-      apply FTau with P.
-      + rewrite Cong.
-        rewrite itree_eta, Obs.
-        now apply eqit_Tau.
+    - apply FTau with P.
+      + now rewrite Cong.
       + assumption.
-    - apply eqitree_inv_Vis_r in H.
-      destruct H as [t' [Obs Cong']].
-      eapply FVis.
-      + rewrite Cong.
-        rewrite itree_eta, Obs.
-        apply eqit_Vis.
-        apply Cong'.
+    - apply FVis with A e k.
+      + now rewrite Cong.
       + assumption.
   Qed.
 
-  Global Instance FST_eq_itree {X} R :
-    Transitive R -> Proper (eq_itree R ==> flip impl) (@FiniteSchedTree X R).
+  Global Instance FST_cong {X} :
+    Proper (eq_itree eq ==> flip impl) (@FiniteSchedTree X eq).
   Proof.
     do 4 red.
-    intros TR x y Cong Fin.
+    intros x y Cong Fin.
     revert x Cong.
     induction Fin;
       intros.
     - apply FSTRet with x.
       now rewrite Cong.
-    - apply eqitree_inv_Tau_r in H.
-      destruct H as [t' [Obs Cong']].
-      apply FSTTau with P.
-      + rewrite Cong.
-        rewrite itree_eta, Obs.
-        apply eqit_Tau.
-        apply Cong'.
+    - apply FSTTau with P.
+      + now rewrite Cong.
       + assumption.
     - apply FSTPlus with k.
       + now rewrite Cong.
@@ -449,6 +435,51 @@ Section EquivSem.
       + now apply Reflexive_eqit.
   Qed.
 
+  Global Instance Finite_eq_head {E} :
+    Proper (eq_itree eq ==> flip impl) (@Finite E head (eq_head eq)).
+  Proof.
+    do 4 red.
+    intros x y Cong Fin.
+    revert x Cong.
+    induction Fin;
+      intros.
+    - apply FRet with x.
+      now rewrite Cong.
+    - apply FTau with P.
+      + now rewrite Cong.
+      + assumption.
+    - apply FVis with A e k.
+      + now rewrite Cong.
+      + assumption.
+  Qed.
+
+  Global Instance Finite_eq_itree_eq_head {E} :
+    Proper (eq_itree (eq_head eq) ==> flip impl) (@Finite E head (eq_head eq)).
+  Proof.
+    do 4 red.
+    intros x y Cong Fin.
+    revert x Cong.
+    induction Fin;
+      intros.
+    - apply FRet with x.
+      eapply Transitive_eqit.
+      apply eq_head_trans, eq_Transitive.
+      + apply Cong.
+      + apply H.
+    - apply FTau with P.
+      + eapply Transitive_eqit.
+        apply eq_head_trans, eq_Transitive.
+        * apply Cong.
+        * apply H.
+      + assumption.
+    - apply FVis with A e k.
+      + eapply Transitive_eqit.
+        apply eq_head_trans, eq_Transitive.
+        * apply Cong.
+        * apply H.
+      + assumption.
+  Qed.
+
   Global Instance FST_eq_head :
     Proper (eq_itree eq ==> flip impl) (FiniteSchedTree (eq_head eq)).
   Proof.
@@ -473,6 +504,45 @@ Section EquivSem.
     - eapply FSTSched3.
       + rewrite Cong.
         apply H.
+      + assumption.
+  Qed.
+
+  Global Instance FST_eq_itree_eq_head :
+    Proper (eq_itree (eq_head eq) ==> flip impl) (FiniteSchedTree (eq_head eq)).
+  Proof.
+    do 4 red.
+    intros * Cong FST.
+    revert Cong.
+    induction FST;
+      intros.
+    - apply FSTRet with x0.
+      eapply Transitive_eqit.
+      apply eq_head_trans, eq_Transitive.
+      + apply Cong.
+      + apply H.
+    - apply FSTTau with P.
+      + eapply Transitive_eqit.
+        apply eq_head_trans, eq_Transitive.
+        * apply Cong.
+        * apply H.
+      + assumption.
+    - eapply FSTPlus.
+      + eapply Transitive_eqit.
+        apply eq_head_trans, eq_Transitive.
+        * apply Cong.
+        * apply H.
+      + assumption.
+    - eapply FSTSched2.
+      + eapply Transitive_eqit.
+        apply eq_head_trans, eq_Transitive.
+        * apply Cong.
+        * apply H.
+      + assumption.
+    - eapply FSTSched3.
+      + eapply Transitive_eqit.
+        apply eq_head_trans, eq_Transitive.
+        * apply Cong.
+        * apply H.
       + assumption.
   Qed.
 
