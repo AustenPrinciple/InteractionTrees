@@ -669,77 +669,93 @@ Section EquivSem.
 
   Lemma step_ccs_through_FST :
     forall (t : ccsT head) (k : head -> ccs) (q : ccs) a hd,
-      FiniteSchedTree eq t ->
+      FiniteSchedTree (eq_head eq) t ->
       Returns_legacy hd t ->
       k hd ⊢ a →ccs q ->
-      (hd <- t;; k hd) ⊢ a →ccs q.
+      (x <- t;; k x) ⊢ a →ccs q.
   Proof.
-    intros * Fin.
-    induction Fin;
-      intros.
-    - inversion H0;
-        subst;
-        rewrite H in H2;
-        [| inv_eqitree H2 | inv_eqitree H2].
-      rewrite H, bind_ret_l.
-      apply eqit_Ret in H2.
-      now rewrite H2.
-    - inversion H0;
-        subst;
-        rewrite H in H2;
-        [inv_eqitree H2 | | inv_eqitree H2].
-      rewrite H, tau_eutt.
-      apply IHFin.
-      + now apply Returns_legacyRet_inv with t.
-      + assumption.
-    - inversion H2;
-        subst;
-        rewrite bind_trigger in H;
-        rewrite H in H4;
-        [inv_eqitree H4 | inv_eqitree H4 |].
-      apply eqitree_inv_Vis_Type in H4 as H6; subst.
-      apply eqitree_inv_event in H4 as H6; subst.
-      eapply eqit_inv_Vis in H4.
-      rewrite <- H4 in H5.
-      rewrite H, bind_vis.
-      apply plus_can_step with x.
-      now apply H1.
-    - inversion H2;
-        subst;
-        rewrite bind_trigger in H;
-        rewrite H in H4;
-        [inv_eqitree H4 | inv_eqitree H4 |].
-      apply eqitree_inv_Vis_Type in H4 as H6; subst.
-      apply eqitree_inv_event in H4 as H6; subst.
-      eapply eqit_inv_Vis in H4.
-      rewrite <- H4 in H5.
-      rewrite H, bind_vis.
-      apply sched2_can_step with x.
-      now apply H1.
-    - inversion H2;
-        subst;
-        rewrite bind_trigger in H;
-        rewrite H in H4;
-        [inv_eqitree H4 | inv_eqitree H4 |].
-      apply eqitree_inv_Vis_Type in H4 as H6; subst.
-      apply eqitree_inv_event in H4 as H6; subst.
-      eapply eqit_inv_Vis in H4.
-      rewrite <- H4 in H5.
-      rewrite H, bind_vis.
-      apply sched3_can_step with x.
-      now apply H1.
-  Qed.
+    intros * FST.
+    revert k q a hd.
+    induction FST;
+      intros * Ret Step.
+    - inversion Ret; subst.
+      + now rewrite H0, bind_ret_l.
+      + apply eq_sub_eutt in H.
+        rewrite H0 in H.
+        now apply eutt_vis_ret_abs in H.
+    - inversion Ret; subst.
+      + now rewrite H0, bind_ret_l.
+      + assert (t ≅ Tau P). admit. (* could H be used here? *)
+        rewrite H2, tau_eutt.
+        apply IHFST with hd.
+        * apply eq_sub_eutt in H2.
+          rewrite tau_eutt in H2.
+          now rewrite <- H2.
+        * assumption.
+    - inversion Ret;
+        subst.
+      + now rewrite H2, bind_ret_l.
+      + rewrite H2, bind_vis.
+        apply eq_sub_eutt in H.
+        rewrite bind_trigger, H2 in H.
+        apply eqit_inv_Vis_Type in H as H4; subst.
+        apply eqit_inv_event in H as H4; subst.
+        apply plus_can_step with x.
+        apply eqit_inv_Vis with (u := x) in H.
+        assert (forall x, k1 x ≈ k x). admit. (* could H be used here? *)
+        rewrite H4.
+        apply H1 with hd.
+        * now rewrite <- H4.
+        * assumption.
+    - inversion Ret;
+        subst.
+      + apply eq_sub_eutt in H.
+        rewrite H2 in H.
+        now apply eutt_ret_trigger_abs in H.
+      + rewrite H2, bind_vis.
+        apply eq_sub_eutt in H.
+        rewrite bind_trigger, H2 in H.
+        apply eqit_inv_Vis_Type in H as H4; subst.
+        apply eqit_inv_event in H as H4; subst.
+        apply sched2_can_step with x.
+        apply eqit_inv_Vis with (u := x) in H.
+        assert (forall x, k1 x ≈ k x). admit. (* could H be used here? *)
+        rewrite H4.
+        apply H1 with hd.
+        * now rewrite <- H4.
+        * assumption.
+    - inversion Ret;
+        subst.
+      + apply eq_sub_eutt in H.
+        rewrite H2 in H.
+        now apply eutt_ret_trigger_abs in H.
+      + rewrite H2, bind_vis.
+        apply eq_sub_eutt in H.
+        rewrite bind_trigger, H2 in H.
+        apply eqit_inv_Vis_Type in H as H4; subst.
+        apply eqit_inv_event in H as H4; subst.
+        apply sched3_can_step with x.
+        apply eqit_inv_Vis with (u := x) in H.
+        assert (forall x, k1 x ≈ k x). admit. (* could H be used here? *)
+        rewrite H4.
+        apply H1 with hd.
+        * now rewrite <- H4.
+        * assumption.
+  Admitted.
 
   Lemma step_ccs_through_FST_weak :
     forall (t : ccsT head) (k : head -> ccs) (q : ccs) a,
-      FiniteSchedTree eq t ->
+      FiniteSchedTree (eq_head eq) t ->
       (forall hd, k hd ⊢ a →ccs q) ->
       (hd <- t;; k hd) ⊢ a →ccs q.
   Proof.
     intros * FST Step.
     revert k q a Step.
+    assert (forall (x: ccsT head) y, eq_itree (eq_head eq) x y -> x ≅ y) as Cheat. admit.
     induction FST;
       intros;
+      apply Cheat in H;
+      clear Cheat;
       rewrite H.
     - now rewrite bind_ret_l.
     - rewrite tau_eutt.
@@ -754,7 +770,7 @@ Section EquivSem.
     - rewrite bind_trigger, bind_vis.
       apply sched3_can_step with Left.
       now apply H1.
-  Qed.
+  Admitted.
 
   Lemma step_ccs_is_returned_by_get_hd :
     forall (p q : ccs) a,
