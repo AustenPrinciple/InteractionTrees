@@ -958,8 +958,7 @@ Section EquivSem.
       cbn;
       unfold h_trigger, trigger.
     4: { destruct a;
-         case_eq (c =? c0)%string;
-         intro;
+         break_match_goal;
          try (unfold dead;
               rewrite bind_trigger);
          eapply FVis.
@@ -998,7 +997,7 @@ Section EquivSem.
     1: {apply FST_means_Finite.
         now apply finite_head. }
     intro rQ.
-    destruct rP, rQ.
+    do 2 break_match_goal.
     - now apply FRet with tt.
     - eapply FVis.
       reflexivity.
@@ -1017,7 +1016,7 @@ Section EquivSem.
       eapply FVis.
       reflexivity.
       intro; cbn.
-      case_eq x; intro; subst.
+      break_match_goal.
       + eapply FVis.
         reflexivity.
         intros []; cbn.
@@ -1031,7 +1030,7 @@ Section EquivSem.
       eapply FVis.
       reflexivity.
       intro; cbn.
-      case_eq x; intro; subst.
+      break_match_goal.
       + eapply FVis.
         reflexivity.
         intros []; cbn.
