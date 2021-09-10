@@ -547,29 +547,6 @@ Section EquivSem.
       + assumption.
   Qed.
 
-  (* TODO: is this lemma really useful? *)
-  Lemma step_cong : forall t u v a,
-      t ≅ u ->
-      t ⊢ a →ccs v ->
-      u ⊢ a →ccs v.
-  Proof.
-    intros * Cong Step.
-    revert Cong.
-    induction Step;
-      intros;
-      try rewrite <- Cong.
-    - now constructor.
-    - now constructor.
-    - now apply S_Plus_L with L R.
-    - now apply S_Plus_R with L R.
-    - now apply S_Sched2_L with L R.
-    - now apply S_Sched2_R with L R.
-    - now apply S_Sched3_L with L R S.
-    - now apply S_Sched3_R with L R S.
-    - now apply S_Sched3_S with L R S.
-  Qed.
-
-  (* the next three lemmas seem to be the useful versions of the one above *)
   Lemma plus_can_step {X} : forall k (k': X -> ccs) a b q,
       (hd <- k b;; k' hd) ⊢ a →ccs q ->
       vis Plus (fun x => (hd <- k x;; k' hd)) ⊢ a →ccs q.
