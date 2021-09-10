@@ -252,12 +252,12 @@ Section Semantics.
   Inductive step : ccs -> option action -> ccs -> Prop :=
   (* Simple action *)
   | S_Act : forall a P P',
-       P' ≈ act a ;; P ->
-       step P' (Some a) P
+       P ≈ act a ;; P' ->
+       step P (Some a) P'
   (* Synchronisation *)
   | S_Synch : forall P P',
-       P' ≈ synch ;; P ->
-       step P' None P
+       P ≈ synch ;; P' ->
+       step P None P'
   (* Choice *)
   | S_Plus_L : forall a P L L' R,
       step L a L' ->
