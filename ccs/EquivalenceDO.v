@@ -384,26 +384,6 @@ Section EquivSem.
       end.
   Hint Unfold eq_head : core.
 
-  Global Instance get_hd_eq_itree {R} :
-    Proper (eq_itree R ==> eq_itree (eq_head R)) get_hd.
-  Proof.
-    do 2 red.
-    ginit.
-    gcofix CIH.
-    intros * EQ.
-    punfold EQ.
-    setoid_rewrite get_hd_unfold.
-    induction EQ; try inv CHECK.
-    - gstep; constructor; reflexivity.
-    - gstep; pclearbot. constructor; auto with paco.
-    - gstep; pclearbot.
-      destruct e as [? | [? | [? | ?]]].
-      + constructor; red; auto with paco.
-      + destruct a; constructor; auto.
-      + destruct s; constructor; auto.
-      + constructor; auto.
-  Qed.
-
   Lemma eq_head_trans {R} :
     Transitive R -> Transitive (eq_head R).
   Proof.
@@ -434,6 +414,26 @@ Section EquivSem.
     - split.
       + reflexivity.
       + now apply Reflexive_eqit.
+  Qed.
+
+  Global Instance get_hd_eq_itree {R} :
+    Proper (eq_itree R ==> eq_itree (eq_head R)) get_hd.
+  Proof.
+    do 2 red.
+    ginit.
+    gcofix CIH.
+    intros * EQ.
+    punfold EQ.
+    setoid_rewrite get_hd_unfold.
+    induction EQ; try inv CHECK.
+    - gstep; constructor; reflexivity.
+    - gstep; pclearbot. constructor; auto with paco.
+    - gstep; pclearbot.
+      destruct e as [? | [? | [? | ?]]].
+      + constructor; red; auto with paco.
+      + destruct a; constructor; auto.
+      + destruct s; constructor; auto.
+      + constructor; auto.
   Qed.
 
   Global Instance Finite_eq_head {E} :
