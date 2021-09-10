@@ -252,12 +252,12 @@ Section Semantics.
   Inductive step : ccs -> option action -> ccs -> Prop :=
   (* Simple action *)
   | S_Act : forall a P P',
-       P' ≈ act a ;; P ->
-       step P' (Some a) P
+       P ≈ act a ;; P' ->
+       step P (Some a) P'
   (* Synchronisation *)
   | S_Synch : forall P P',
-       P' ≈ synch ;; P ->
-       step P' None P
+       P ≈ synch ;; P' ->
+       step P None P'
   (* Choice *)
   | S_Plus_L : forall a P L L' R,
       step L a L' ->
@@ -268,27 +268,27 @@ Section Semantics.
       P ≈ plus L R ->
       step P a R'
   (* Two-way parallelism *)
-  | S_Sched2_L : forall a P P' L L' R,
+  | S_Sched2_L : forall a P L L' R,
       step L a L' ->
       P ≈ branch2 L R ->
-      step P a P'
-  | S_Sched2_R : forall a P P' L R R',
+      step P a L'
+  | S_Sched2_R : forall a P L R R',
       step R a R' ->
       P ≈ branch2 L R ->
-      step P a P'
+      step P a R'
   (* Three-way parallelism *)
-  | S_Sched3_L : forall a P P' L L' R S,
+  | S_Sched3_L : forall a P L L' R S,
       step L a L' ->
       P ≈ branch3 L R S ->
-      step P a P'
-  | S_Sched3_R : forall a P P' L R R' S,
+      step P a L'
+  | S_Sched3_R : forall a P L R R' S,
       step R a R' ->
       P ≈ branch3 L R S ->
-      step P a P'
-  | S_Sched3_S : forall a P P' L R S S',
+      step P a R'
+  | S_Sched3_S : forall a P L R S S',
       step S a S' ->
       P ≈ branch3 L R S ->
-      step P a P'.
+      step P a S'.
 
   #[global] Instance eutt_step :
     Proper (eutt eq ==> eq ==> eutt eq ==> flip impl) step.
@@ -298,20 +298,20 @@ Section Semantics.
     induction STEP; intros.
     - apply S_Act; rewrite EQ1,H; apply eqit_bind; [reflexivity | intros ?; symmetry; auto].
     - apply S_Synch; rewrite EQ1,H; apply eqit_bind; [reflexivity | intros ?; symmetry; auto].
-    - eapply S_Plus_L; [| rewrite EQ1; eauto].
-      apply IHSTEP; [reflexivity | auto].
-    - eapply S_Plus_R; [| rewrite EQ1; eauto].
-      apply IHSTEP; [reflexivity | auto].
-    - eapply S_Sched2_L; [| rewrite EQ1; eauto].
-      apply IHSTEP; [reflexivity | reflexivity].
-    - eapply S_Sched2_R; [| rewrite EQ1; eauto].
-      apply IHSTEP; [reflexivity | reflexivity].
-    - eapply S_Sched3_L ; [| rewrite EQ1; eauto].
-      apply IHSTEP; [reflexivity | reflexivity].
-    - eapply S_Sched3_R ; [| rewrite EQ1; eauto].
-      apply IHSTEP; [reflexivity | reflexivity].
-    - eapply S_Sched3_S ; [| rewrite EQ1; eauto].
-      apply IHSTEP; [reflexivity | reflexivity].
+    - apply S_Plus_L with L R; [| now rewrite EQ1].
+      apply IHSTEP; [reflexivity | assumption].
+    - apply S_Plus_R with L R; [| now rewrite EQ1].
+      apply IHSTEP; [reflexivity | assumption].
+    - apply S_Sched2_L with L R; [| now rewrite EQ1].
+      apply IHSTEP; [ reflexivity | assumption].
+    - apply S_Sched2_R with L R; [| now rewrite EQ1].
+      apply IHSTEP; [ reflexivity | assumption].
+    - apply S_Sched3_L with L R S; [| now rewrite EQ1].
+      apply IHSTEP; [ reflexivity | assumption].
+    - apply S_Sched3_R with L R S; [| now rewrite EQ1].
+      apply IHSTEP; [ reflexivity | assumption].
+    - apply S_Sched3_S with L R S; [| now rewrite EQ1].
+      apply IHSTEP; [ reflexivity | assumption].
   Qed.
 
   CoInductive bisim_old : ccs -> ccs -> Prop :=
