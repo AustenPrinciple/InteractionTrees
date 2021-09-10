@@ -238,18 +238,19 @@ Section EquivSem.
     | None => HSynch
     end.
 
-  Lemma eqitree_inv_Vis_Type {E X1 X2 R1 R2} (RR : R1 -> R2 -> Prop) (e1 : E X1) (e2: E X2) (k1 : X1 -> itree E R1) (k2 : X2 -> itree E R2)
-        (EQ : eq_itree RR (Vis e1 k1) (Vis e2 k2)) : X1 = X2.
+  Lemma eqit_inv_Vis_Type {E X1 X2 R1 R2} (RR : R1 -> R2 -> Prop) (b1 b2: bool) (e1 : E X1) (e2: E X2) (k1 : X1 -> itree E R1) (k2 : X2 -> itree E R2)
+        (EQ : eqit RR b1 b2 (Vis e1 k1) (Vis e2 k2)) : X1 = X2.
   Proof.
     punfold EQ; inv EQ.
-    dependent destruction H2; reflexivity.
+    reflexivity.
   Qed.
 
-  Lemma eqitree_inv_event {E X R} (RR : R -> R -> Prop) (e1 e2 : E X) (k1 k2 : X -> itree E R)
-        (EQ : eq_itree RR (Vis e1 k1) (Vis e2 k2)) : e1 = e2.
+  Lemma eqit_inv_event {E X R} (RR : R -> R -> Prop) (b1 b2: bool) (e1 e2 : E X) (k1 k2 : X -> itree E R)
+        (EQ : eqit RR b1 b2 (Vis e1 k1) (Vis e2 k2)) : e1 = e2.
   Proof.
     punfold EQ; inv EQ.
-    dependent destruction H4; reflexivity.
+    dependent destruction H4.
+    reflexivity.
   Qed.
 
   Inductive Returns_legacy {E} {A: Type} (a: A) : itree E A -> Prop :=
