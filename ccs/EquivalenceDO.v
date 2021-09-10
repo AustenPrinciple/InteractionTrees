@@ -253,7 +253,7 @@ Section EquivSem.
     reflexivity.
   Qed.
 
-  Inductive Returns_legacy {E} {A: Type} (a: A) : itree E A -> Prop :=
+  Inductive Returns_legacy {E A} (a: A) : itree E A -> Prop :=
   | Returns_legacyRet: forall t, t ≈ Ret a -> Returns_legacy a t
   | Returns_legacyVis: forall {X} (e: E X) (x: X) t k,
       t ≈ Vis e k -> Returns_legacy a (k x) -> Returns_legacy a t.
@@ -548,7 +548,7 @@ Section EquivSem.
   Qed.
 
   (* TODO: is this lemma really useful? *)
-  Lemma step_eq_itree : forall t u v a,
+  Lemma step_cong : forall t u v a,
       t ≅ u ->
       t ⊢ a →ccs v ->
       u ⊢ a →ccs v.
