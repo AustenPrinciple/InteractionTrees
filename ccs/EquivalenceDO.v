@@ -935,6 +935,28 @@ Section EquivSem.
           now rewrite Rel.
   Qed.
 
+  Lemma finite_restrict {Y}: forall c (e: ccsE Y),
+      Finite eq (h_restrict c Y e).
+  Proof.
+    intros.
+    destruct e as [[ |  | ] | [[?] | [? | ?]]];
+      cbn;
+      unfold h_trigger, trigger.
+    4: { destruct a;
+         case_eq (c =? c0)%string;
+         intro;
+         try (unfold dead;
+              rewrite bind_trigger);
+         eapply FVis.
+         1,3,5,7: reflexivity.
+         all: intro;
+           ( now apply FRet with x || induction x). }
+    all: eapply FVis.
+    1,3,5,7,9: reflexivity.
+    all: intro;
+      now apply FRet with x.
+  Qed.
+
   (* In order to prove that : [forall P, finite (model P)],
      we need to reason about the co-recursive call performed by para.
      However, this call does not take place on immediately structurally smaller
@@ -947,6 +969,67 @@ Section EquivSem.
      strong induction on the sum of the sizes of both trees, which requires quite
      a bit of boilerplate and work.
    *)
+
+  Lemma finite_para : forall P Q,
+      Finite eq P -> Finite eq Q -> Finite eq (para P Q).
+  Proof.
+    intros.
+    rewrite para_unfold.
+    apply finite_bind'.
+    1: {apply FST_means_Finite.
+        now apply finite_head. }
+    intro rP.
+    apply finite_bind'.
+    1: {apply FST_means_Finite.
+        now apply finite_head. }
+    intro rQ.
+    destruct rP, rQ.
+    - now apply FRet with tt.
+    - eapply FVis.
+      reflexivity.
+      intro; cbn.
+      admit.
+    - eapply FVis.
+      reflexivity.
+      intro; cbn.
+      admit.
+    - eapply FVis.
+      reflexivity.
+      intro; cbn.
+      admit.
+    - unfold branch2.
+      rewrite bind_trigger.
+      eapply FVis.
+      reflexivity.
+      intro; cbn.
+      case_eq x; intro; subst.
+      + eapply FVis.
+        reflexivity.
+        intros []; cbn.
+        admit.
+      + eapply FVis.
+        reflexivity.
+        intros []; cbn.
+        admit.
+    - unfold branch2.
+      rewrite bind_trigger.
+      eapply FVis.
+      reflexivity.
+      intro; cbn.
+      case_eq x; intro; subst.
+      + eapply FVis.
+        reflexivity.
+        intros []; cbn.
+        admit.
+      + eapply FVis.
+        reflexivity.
+        intros []; cbn.
+        admit.
+    - admit.
+    - admit.
+    - admit.
+  Admitted.
+
   Lemma finite_model : forall (P : term),
       Finite eq ⟦P⟧.
   Proof.
@@ -960,53 +1043,20 @@ Section EquivSem.
       rewrite bind_trigger.
       now eapply FVis.
     - (* para *)
-      rewrite para_unfold.
-      apply finite_bind.
-      + apply FST_means_Finite.
-        now apply finite_head'.
-      + intro rP.
-        apply finite_bind.
-        * apply FST_means_Finite.
-          now apply finite_head'.
-        * intro rQ.
-          destruct rP, rQ;
-            try assumption.
-          -- now apply FRet with tt.
-          -- admit.
-          -- admit.
-          -- admit.
-          -- unfold branch2.
-             rewrite bind_trigger.
-             eapply FVis.
-             ++ reflexivity.
-             ++ intro.
-                cbn.
-                case_eq x; intro; subst.
-                ** eapply FVis.
-                   --- reflexivity.
-                   --- intros []; cbn.
-                       admit.
-                ** eapply FVis.
-                   --- reflexivity.
-                   --- intro; cbn.
-                       admit.
-          -- admit.
-          -- admit.
-          -- admit.
-          -- admit.
+      now apply finite_para.
     - (* plus *)
       unfold plus.
       rewrite bind_trigger.
       eapply FVis.
-      + reflexivity.
-      + intro b.
-        case_eq b;
-          auto.
+      reflexivity.
+      intro.
+      case_eq x; auto.
     - (* restrict *)
       apply finite_interp.
-      + assumption.
-      + admit.
-  Admitted.
+      assumption.
+      intros.
+      apply finite_restrict.
+  Qed.
 
 
   Lemma op_involutive : forall a, op (op a) = a.
