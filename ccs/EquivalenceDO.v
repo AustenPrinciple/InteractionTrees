@@ -804,19 +804,15 @@ Section EquivSem.
     - (* Tau *)
       pose proof (get_hd_unfold (Tau P)) as Eq;
         cbn in Eq.
-      eapply FST_eq_itree.
-      + apply eq_head_trans, eq_Transitive.
-      + apply get_hd_eq_itree.
-        apply H.
+      apply FST_eq_itree_eq_head with (get_hd (Tau P)).
+      + now apply get_hd_eq_itree in H.
       + rewrite Eq.
         apply FSTTau with (get_hd P).
         * apply Reflexive_eqit, eq_head_refl, eq_Reflexive.
         * assumption.
     - (* Vis *)
-      eapply FST_eq_itree.
-      + apply eq_head_trans, eq_Transitive.
-      + apply get_hd_eq_itree.
-        apply H.
+      apply FST_eq_itree_eq_head with (get_hd (Vis e k)).
+      + now apply get_hd_eq_itree in H.
       + rewrite get_hd_unfold; cbn.
         break_match_goal.
         * (* Vis NonDetE, special case *)
@@ -1218,14 +1214,14 @@ Section EquivSem.
   Proof.
     intros * StepOp.
     (* Lock-step simulation *)
-    induction StepOp;
-      try now constructor.
-    + apply SumL_sem; assumption.
-    + apply SumR_sem; assumption.
-    + apply ParL_sem; assumption.
-    + apply ParR_sem; assumption.
+    induction StepOp.
+    + now constructor.
+    + now apply SumL_sem.
+    + now apply SumR_sem.
+    + now apply ParL_sem.
+    + now apply ParR_sem.
     + eapply ParS_sem; eassumption.
-    + apply Restrict_sem; assumption.
+    + now apply Restrict_sem.
   Qed.
 
   Definition stuck_ccs P := forall a Q, ~ P ⊢a→ccs Q.
@@ -1416,7 +1412,7 @@ Section EquivSem.
       ebind; apply pbc_intro_h with eq.
       + destruct e as [| [| []]]; cbn; unfold h_trigger; cbn.
         all: try (rewrite !interp_trigger; cbn;unfold h_trigger; cbn; reflexivity).
-        destruct a as [[|]]; cbn; repeat break_match_goal; cbn.
+        destruct a; cbn; repeat break_match_goal; cbn.
         all: rewrite ?restrict_dead',?interp_trigger; cbn; rewrite ?Heqb,?Heqb0; reflexivity.
       + intros ? ? ->.
         rewrite !interp_tau.
@@ -1508,12 +1504,6 @@ Section EquivSem.
   Qed.
 
   (* BEGIN PROOFS IN PROGRESS FOR THE ADMITTED LEMMAS ABOVE *)
-
-
-  Lemma get_hd_FST : forall P, FiniteSchedTree (get_hd (model P)).
-  Proof.
-    intros; eapply finite_head, finite_model.
-  Qed.
 
   Theorem get_hd_means_step_deprecated : forall P a P',
       Returns_legacy (head_of_action a P') (get_hd P)
