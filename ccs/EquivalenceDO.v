@@ -832,27 +832,6 @@ Section EquivSem.
             apply Reflexive_eqit, eq_head_refl, eq_Reflexive.
   Qed.
 
-  Lemma finite_head' : forall P,
-      Finite eq P ->
-      FiniteSchedTree eq (get_hd P).
-  Proof.
-    intros * Fin.
-    induction Fin.
-    - apply FSTRet with HDone.
-      pose proof (get_hd_unfold (Ret x)) as Eq;
-        cbn in Eq.
-      rewrite <- Eq.
-      (* this seems trivial but get_hd doesn't interact well with ≅ *)
-      admit.
-    - pose proof (get_hd_unfold (Tau P)) as Eq;
-        cbn in Eq.
-      apply FSTTau with (get_hd P).
-      + rewrite <- Eq.
-        admit.
-      + assumption.
-    - admit.
-  Admitted.
-
   Lemma finite_bind {E X Y} : forall (t: itree E Y) (k: Y -> itree E X),
       Finite eq t -> (forall y, Finite eq (k y)) -> Finite eq (y <- t;; k y).
   Proof.
@@ -877,6 +856,36 @@ Section EquivSem.
         now rewrite Rel.
   Qed.
 
+  Lemma finite_bind' {E X} : forall t (k: head -> itree E X),
+      Finite (eq_head eq) t -> (forall y, Finite eq (k y)) -> Finite eq (y <- t;; k y).
+  Proof.
+    intros * Fin.
+    revert X k.
+    induction Fin;
+      intros * FinK.
+    - (* Ret *)
+      apply eqitree_inv_Ret_r in H as [r [_ Eq]].
+      rewrite unfold_bind, Eq.
+      apply FinK.
+    - (* Tau *)
+      apply eqitree_inv_Tau_r in H as [P' [Eq R]].
+      rewrite unfold_bind, Eq.
+      apply FTau with (y <- P';; k y).
+      + reflexivity.
+      + apply IHFin in FinK as FinP.
+        (* rewrite R *)
+        admit.
+    - (* Vis *)
+      apply eqitree_inv_Vis_r in H as [k' [Eq Rel]].
+      rewrite unfold_bind, Eq.
+      apply FVis with A e (fun x : A => y <- k' x;; k0 y).
+      + reflexivity.
+      + intro.
+        apply (H1 x) in FinK.
+        (* now rewrite Rel. *)
+        admit.
+  Admitted.
+
   Lemma FST_means_Finite {X} : forall (P: ccsT X) R,
       FiniteSchedTree R P -> Finite R P.
   Proof.
@@ -894,12 +903,6 @@ Section EquivSem.
       eapply FVis;
         eauto.
   Qed.
-
-  (* proving this might be easier than finite_head', and we need one or the other *)
-  Lemma FST_means_Finite' : forall P,
-      FiniteSchedTree (eq_head eq) P -> Finite eq P.
-  Proof.
-  Admitted.
 
   Lemma finite_interp {E F X} : forall (h : Handler E F) (t : itree E X),
       Finite eq t ->
@@ -1044,9 +1047,9 @@ Section EquivSem.
     rewrite para_unfold.
     apply step_ccs_through_FST with (head_of_action a ⟦P'⟧).
     3:apply step_ccs_through_FST_weak.
-    * apply finite_head', finite_model.
+    * apply finite_head, finite_model.
     * apply step_ccs_is_returned_by_get_hd; assumption.
-    * apply finite_head', finite_model.
+    * apply finite_head, finite_model.
     * intros hd.
       destruct hd eqn:EQHD, a eqn:EQa; cbn;
         try (constructor; unfold act,synch; rewrite bind_trigger; reflexivity);
@@ -1067,8 +1070,8 @@ Section EquivSem.
     rewrite para_unfold.
     apply step_ccs_through_FST_weak.
     2:intros; apply step_ccs_through_FST with (head_of_action a ⟦Q'⟧).
-    * apply finite_head', finite_model.
-    * apply finite_head', finite_model.
+    * apply finite_head, finite_model.
+    * apply finite_head, finite_model.
     * apply step_ccs_is_returned_by_get_hd; assumption.
     * destruct hd eqn:EQHD, a eqn:EQa; cbn;
         try (constructor; unfold act,synch; rewrite bind_trigger; reflexivity);
@@ -1090,9 +1093,9 @@ Section EquivSem.
     rewrite para_unfold.
     apply step_ccs_through_FST with (head_of_action (Some a) ⟦P'⟧).
     3:apply step_ccs_through_FST with (head_of_action (Some (op a)) ⟦Q'⟧).
-    * apply finite_head', finite_model.
+    * apply finite_head, finite_model.
     * apply step_ccs_is_returned_by_get_hd; assumption.
-    * apply finite_head', finite_model.
+    * apply finite_head, finite_model.
     * apply step_ccs_is_returned_by_get_hd; assumption.
     * cbn.
       unfold are_opposite.
