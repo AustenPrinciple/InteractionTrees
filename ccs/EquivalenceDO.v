@@ -756,18 +756,11 @@ Section EquivSem.
     intros.
     induction H.
     - apply Returns_legacyRet.
-      pose proof (get_hd_unfold (act a;; P)) as Eq;
+      pose proof (get_hd_unfold (act a;; P')) as Eq;
         revert Eq;
         cbn;
         ITree.fold_subst;
         intro.
-      assert (Ret tt;; P ≅ P).
-      now rewrite bind_ret_l.
-      assert (forall (x: ccsT head) y, x ≅ y -> eq_itree (eq_head eq) x y).
-      intros.
-      rewrite H1.
-      apply Reflexive_eqit, eq_head_refl, eq_Reflexive.
-      apply H1 in Eq.
       (* since the right part of Eq is (Ret tt;; P) maybe it's not
          a ≅ we want but a ≈ ? *)
       admit.
