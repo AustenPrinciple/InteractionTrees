@@ -653,7 +653,10 @@ Section EquivSem.
   Proof.
     intros * FST.
     revert k q a hd.
+    assert (forall (x: ccsT head) y, eq_itree (eq_head eq) x y -> x ≅ y) as Cheat. admit.
     induction FST;
+      apply Cheat in H;
+      clear Cheat;
       intros * Ret Step.
     - inversion Ret; subst.
       + now rewrite H0, bind_ret_l.
@@ -662,12 +665,11 @@ Section EquivSem.
         now apply eutt_vis_ret_abs in H.
     - inversion Ret; subst.
       + now rewrite H0, bind_ret_l.
-      + assert (t ≅ Tau P). admit. (* could H be used here? *)
-        rewrite H2, tau_eutt.
+      + rewrite H, tau_eutt.
         apply IHFST with hd.
-        * apply eq_sub_eutt in H2.
-          rewrite tau_eutt in H2.
-          now rewrite <- H2.
+        * apply eq_sub_eutt in H.
+          rewrite tau_eutt in H.
+          now rewrite <- H.
         * assumption.
     - inversion Ret;
         subst.
@@ -679,10 +681,9 @@ Section EquivSem.
         apply eqit_inv_event in H as H4; subst.
         apply plus_can_step with x.
         apply eqit_inv_Vis with (u := x) in H.
-        assert (forall x, k1 x ≈ k x). admit. (* could H be used here? *)
-        rewrite H4.
+        rewrite H.
         apply H1 with hd.
-        * now rewrite <- H4.
+        * now rewrite <- H.
         * assumption.
     - inversion Ret;
         subst.
@@ -696,10 +697,9 @@ Section EquivSem.
         apply eqit_inv_event in H as H4; subst.
         apply sched2_can_step with x.
         apply eqit_inv_Vis with (u := x) in H.
-        assert (forall x, k1 x ≈ k x). admit. (* could H be used here? *)
-        rewrite H4.
+        rewrite H.
         apply H1 with hd.
-        * now rewrite <- H4.
+        * now rewrite <- H.
         * assumption.
     - inversion Ret;
         subst.
@@ -713,10 +713,9 @@ Section EquivSem.
         apply eqit_inv_event in H as H4; subst.
         apply sched3_can_step with x.
         apply eqit_inv_Vis with (u := x) in H.
-        assert (forall x, k1 x ≈ k x). admit. (* could H be used here? *)
-        rewrite H4.
+        rewrite H.
         apply H1 with hd.
-        * now rewrite <- H4.
+        * now rewrite <- H.
         * assumption.
   Admitted.
 
