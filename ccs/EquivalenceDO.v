@@ -926,7 +926,7 @@ Section EquivSem.
           now rewrite Rel.
   Qed.
 
-  Lemma finite_restrict {Y}: forall c (e: ccsE Y),
+  Lemma finite_restrict {Y} : forall c (e: ccsE Y),
       Finite eq (h_restrict c Y e).
   Proof.
     intros.
@@ -966,12 +966,12 @@ Section EquivSem.
     intros.
     rewrite para_unfold.
     apply finite_bind'.
-    1: {apply FST_means_Finite.
-        now apply finite_head. }
+    1: { apply FST_means_Finite.
+         now apply finite_head. }
     intro rP.
     apply finite_bind'.
-    1: {apply FST_means_Finite.
-        now apply finite_head. }
+    1: { apply FST_means_Finite.
+         now apply finite_head. }
     intro rQ.
     do 2 break_match_goal.
     - now apply FRet with tt.
