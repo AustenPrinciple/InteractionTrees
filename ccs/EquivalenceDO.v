@@ -845,15 +845,13 @@ Section EquivSem.
       intros * FinK.
     - (* Ret *)
       apply eqitree_inv_Ret_r in H as [r [_ Eq]].
-      rewrite unfold_bind, Eq.
-      apply FinK.
+      now rewrite unfold_bind, Eq.
     - (* Tau *)
-      apply eqitree_inv_Tau_r in H as [P' [Eq R]].
+      apply eqitree_inv_Tau_r in H as [P' [Eq EqH]].
       rewrite unfold_bind, Eq.
       apply FTau with (y <- P';; k y).
       + reflexivity.
       + apply IHFin in FinK as FinP.
-        (* rewrite R *)
         admit.
     - (* Vis *)
       apply eqitree_inv_Vis_r in H as [k' [Eq Rel]].
@@ -959,12 +957,10 @@ Section EquivSem.
     intros.
     rewrite para_unfold.
     apply finite_bind'.
-    1: { apply FST_means_Finite.
-         now apply finite_head. }
+    now apply FST_means_Finite, finite_head.
     intro rP.
     apply finite_bind'.
-    1: { apply FST_means_Finite.
-         now apply finite_head. }
+    now apply FST_means_Finite, finite_head.
     intro rQ.
     do 2 break_match_goal.
     - now apply FRet with tt.
